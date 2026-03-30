@@ -11,6 +11,8 @@ export const FALLBACK_COFFEES: CoffeeEntry[] = [
     price: "$22.00",
     date: new Date().toISOString(),
     link: "#",
+    imageUrl: "",
+    isMerch: false,
   },
   {
     id: "demo-2",
@@ -22,6 +24,8 @@ export const FALLBACK_COFFEES: CoffeeEntry[] = [
     price: "$24.00",
     date: new Date().toISOString(),
     link: "#",
+    imageUrl: "",
+    isMerch: false,
   },
   {
     id: "demo-3",
@@ -33,6 +37,8 @@ export const FALLBACK_COFFEES: CoffeeEntry[] = [
     price: "$18.00",
     date: new Date().toISOString(),
     link: "#",
+    imageUrl: "",
+    isMerch: false,
   },
   {
     id: "demo-4",
@@ -44,6 +50,8 @@ export const FALLBACK_COFFEES: CoffeeEntry[] = [
     price: "$26.00",
     date: new Date().toISOString(),
     link: "#",
+    imageUrl: "",
+    isMerch: false,
   },
   {
     id: "demo-5",
@@ -55,5 +63,7 @@ export const FALLBACK_COFFEES: CoffeeEntry[] = [
     price: "$20.00",
     date: new Date().toISOString(),
     link: "#",
+    imageUrl: "",
+    isMerch: false,
   },
 ];

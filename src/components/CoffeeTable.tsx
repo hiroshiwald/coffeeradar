@@ -33,6 +33,7 @@ export default function CoffeeTable() {
   const [filterType, setFilterType] = useState("");
   const [filterProcess, setFilterProcess] = useState("");
   const [filterNote, setFilterNote] = useState("");
+  const [showMerch, setShowMerch] = useState(false);
 
   const fetchData = useCallback(async (refresh = false) => {
     setLoading(true);
@@ -50,11 +51,11 @@ export default function CoffeeTable() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Collect unique values for filters
   const allNotes = useMemo(() => {
     if (!data) return [];
     const counts = new Map<string, number>();
     for (const c of data.coffees) {
+      if (c.isMerch) continue;
       for (const n of c.tastingNotes) {
         counts.set(n, (counts.get(n) ?? 0) + 1);
       }
@@ -62,10 +63,12 @@ export default function CoffeeTable() {
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([n]) => n);
   }, [data]);
 
-  // Filter & sort
   const filtered = useMemo(() => {
     if (!data) return [];
     let list = data.coffees;
+
+    // Merch filter
+    if (!showMerch) list = list.filter((c) => !c.isMerch);
 
     if (search) {
       const q = search.toLowerCase();
@@ -103,7 +106,7 @@ export default function CoffeeTable() {
       return 0;
     });
     return sorted;
-  }, [data, search, filterType, filterProcess, filterNote, sortKey, sortDir]);
+  }, [data, search, filterType, filterProcess, filterNote, sortKey, sortDir, showMerch]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -120,6 +123,7 @@ export default function CoffeeTable() {
   }
 
   const meta = data?.meta;
+  const merchCount = data ? data.coffees.filter((c) => c.isMerch).length : 0;
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 sm:py-10">
@@ -129,12 +133,23 @@ export default function CoffeeTable() {
           <h1 className="text-2xl sm:text-3xl font-light tracking-tight">CoffeeRadar</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">New releases from specialty roasters</p>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <a
+            href="/admin"
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            title="Admin"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </a>
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* Controls */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        {/* Search */}
         <div className="relative flex-1">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -148,7 +163,6 @@ export default function CoffeeTable() {
           />
         </div>
 
-        {/* Filters */}
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
@@ -170,10 +184,25 @@ export default function CoffeeTable() {
           <option value="Natural">Natural</option>
           <option value="Honey">Honey</option>
           <option value="Anaerobic">Anaerobic</option>
+          <option value="Anaerobic Natural">Anaerobic Natural</option>
           <option value="Co-Ferment">Co-Ferment</option>
+          <option value="Yellow Honey">Yellow Honey</option>
+          <option value="Red Honey">Red Honey</option>
+          <option value="Black Honey">Black Honey</option>
         </select>
 
-        {/* Refresh */}
+        {/* Merch toggle */}
+        <button
+          onClick={() => setShowMerch(!showMerch)}
+          className={`px-3 py-2.5 rounded-lg border text-sm transition whitespace-nowrap ${
+            showMerch
+              ? "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
+              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400"
+          }`}
+        >
+          {showMerch ? `Merch (${merchCount})` : "Show Merch"}
+        </button>
+
         <button
           onClick={() => fetchData(true)}
           disabled={loading}
@@ -216,7 +245,7 @@ export default function CoffeeTable() {
         <span className="ml-auto">{filtered.length} coffees</span>
       </div>
 
-      {/* Note tag filter chips */}
+      {/* Active note filter */}
       {filterNote && (
         <div className="flex items-center gap-2 mb-4">
           <span className="text-xs text-gray-500 dark:text-gray-400">Note:</span>
@@ -237,6 +266,7 @@ export default function CoffeeTable() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+              <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300 w-12"></th>
               {(
                 [
                   ["date", "Date"],
@@ -269,7 +299,7 @@ export default function CoffeeTable() {
             {loading && !data ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 7 }).map((_, j) => (
+                  {Array.from({ length: 8 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
                     </td>
@@ -278,13 +308,29 @@ export default function CoffeeTable() {
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
                   No coffees match your filters.
                 </td>
               </tr>
             ) : (
               filtered.map((c: CoffeeEntry) => (
                 <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors">
+                  <td className="px-4 py-2">
+                    {c.imageUrl ? (
+                      <img
+                        src={c.imageUrl}
+                        alt=""
+                        className="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-800"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                        </svg>
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(c.date)}</td>
                   <td className="px-4 py-3 font-medium whitespace-nowrap">{c.roaster}</td>
                   <td className="px-4 py-3">
@@ -298,7 +344,11 @@ export default function CoffeeTable() {
                     </a>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {c.type !== "Unknown" && (
+                    {c.isMerch ? (
+                      <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
+                        Merch
+                      </span>
+                    ) : c.type !== "Unknown" ? (
                       <span
                         className={`inline-block px-2 py-0.5 rounded-full text-xs ${
                           c.type === "Single Origin"
@@ -308,7 +358,7 @@ export default function CoffeeTable() {
                       >
                         {c.type}
                       </span>
-                    )}
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.process}</td>
                   <td className="px-4 py-3">
@@ -324,7 +374,7 @@ export default function CoffeeTable() {
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.price}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap font-mono text-xs tabular-nums">{c.price}</td>
                 </tr>
               ))
             )}

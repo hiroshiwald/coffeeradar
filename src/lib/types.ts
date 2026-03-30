@@ -2,6 +2,7 @@ export interface FeedSource {
   name: string;
   url: string;
   website: string;
+  enabled?: boolean;
 }
 
 export interface CoffeeEntry {
@@ -14,6 +15,8 @@ export interface CoffeeEntry {
   price: string;
   date: string;
   link: string;
+  imageUrl: string;
+  isMerch: boolean;
 }
 
 export interface ApiResponse {

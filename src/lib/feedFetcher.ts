@@ -1,17 +1,17 @@
-import { readFileSync } from "fs";
-import { join } from "path";
-import { FeedSource, CoffeeEntry } from "./types";
+import { CoffeeEntry } from "./types";
 import { parseFeed } from "./feedParser";
+import { getSources } from "./sources";
 
 const CONCURRENCY = 25;
 const TIMEOUT = 5000;
 
-function loadSources(): FeedSource[] {
-  const raw = readFileSync(join(process.cwd(), "data", "sources.json"), "utf8");
-  return JSON.parse(raw);
+interface FetchTarget {
+  name: string;
+  url: string;
+  website: string;
 }
 
-async function fetchOne(source: FeedSource): Promise<{ entries: CoffeeEntry[]; ok: boolean }> {
+async function fetchOne(source: FetchTarget): Promise<{ entries: CoffeeEntry[]; ok: boolean }> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT);
@@ -35,14 +35,14 @@ export async function fetchAllFeeds(): Promise<{
   failed: number;
   total: number;
 }> {
-  const sources = loadSources();
+  const allSources = getSources();
+  const enabled = allSources.filter((s) => s.enabled !== false);
   const allEntries: CoffeeEntry[] = [];
   let healthy = 0;
   let failed = 0;
 
-  // Process in batches
-  for (let i = 0; i < sources.length; i += CONCURRENCY) {
-    const batch = sources.slice(i, i + CONCURRENCY);
+  for (let i = 0; i < enabled.length; i += CONCURRENCY) {
+    const batch = enabled.slice(i, i + CONCURRENCY);
     const results = await Promise.all(batch.map(fetchOne));
     for (const r of results) {
       if (r.ok) {
@@ -54,12 +54,11 @@ export async function fetchAllFeeds(): Promise<{
     }
   }
 
-  // Sort by date descending
   allEntries.sort((a, b) => {
     const da = new Date(a.date).getTime() || 0;
     const db = new Date(b.date).getTime() || 0;
     return db - da;
   });
 
-  return { coffees: allEntries, healthy, failed, total: sources.length };
+  return { coffees: allEntries, healthy, failed, total: enabled.length };
 }

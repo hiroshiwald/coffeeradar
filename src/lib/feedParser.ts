@@ -1,11 +1,46 @@
 import { XMLParser } from "fast-xml-parser";
 import { CoffeeEntry } from "./types";
-import { detectType, detectProcess, extractNotes, extractPrice } from "./heuristics";
+import { detectType, detectProcess, extractNotes, extractPrice, isMerchandise } from "./heuristics";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
 });
+
+function extractImage(entry: Record<string, unknown>): string {
+  // Shopify s:image element
+  const sImage = entry["s:image"];
+  if (sImage) {
+    const img = Array.isArray(sImage) ? sImage[0] : sImage;
+    const url = typeof img === "object" && img !== null
+      ? String((img as Record<string, unknown>)["#text"] ?? img)
+      : String(img);
+    if (url && url.startsWith("http")) return url;
+  }
+
+  // Image from content HTML: <img src="...">
+  const content = typeof entry.content === "object" && entry.content !== null
+    ? String((entry.content as Record<string, unknown>)["#text"] ?? "")
+    : String(entry.content ?? "");
+  const imgMatch = content.match(/src=["']([^"']*(?:cdn\.shopify|amazonaws|cloudinary|imgix)[^"']*)/i)
+    || content.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)/i);
+  if (imgMatch) return imgMatch[1];
+
+  return "";
+}
+
+function extractShopifyTags(entry: Record<string, unknown>): string[] {
+  const tags = entry["s:tag"];
+  if (!tags) return [];
+  const arr = Array.isArray(tags) ? tags : [tags];
+  return arr.map((t) => String(t)).filter(Boolean);
+}
+
+function extractProductType(entry: Record<string, unknown>): string {
+  const pt = entry["s:type"] ?? entry["s:product-type"];
+  if (pt) return String(pt);
+  return "";
+}
 
 export function parseAtomFeed(xml: string, roaster: string, website: string): CoffeeEntry[] {
   try {
@@ -20,7 +55,10 @@ export function parseAtomFeed(xml: string, roaster: string, website: string): Co
       const content = typeof e.content === "object" && e.content !== null
         ? String((e.content as Record<string, unknown>)["#text"] ?? "")
         : String(e.content ?? "");
-      const allText = `${title} ${summary} ${content}`;
+
+      const shopifyTags = extractShopifyTags(e);
+      const productType = extractProductType(e);
+      const allText = `${title} ${summary} ${content} ${shopifyTags.join(" ")} ${productType}`;
 
       // Extract price from s:price or s:variant or content
       let price = "";
@@ -44,10 +82,12 @@ export function parseAtomFeed(xml: string, roaster: string, website: string): Co
         coffee: title,
         type: detectType(allText),
         process: detectProcess(allText),
-        tastingNotes: extractNotes(allText),
+        tastingNotes: extractNotes(allText, shopifyTags),
         price,
         date: String(e.published ?? e.updated ?? ""),
         link,
+        imageUrl: extractImage(e),
+        isMerch: isMerchandise(title, productType, shopifyTags),
       };
     });
   } catch {
@@ -67,16 +107,27 @@ export function parseRssFeed(xml: string, roaster: string, website: string): Cof
       const desc = String(item.description ?? "");
       const allText = `${title} ${desc}`;
 
+      // Try to get image from description or enclosure
+      let imageUrl = "";
+      const enclosure = item.enclosure as Record<string, unknown> | undefined;
+      if (enclosure?.["@_url"]) imageUrl = String(enclosure["@_url"]);
+      if (!imageUrl) {
+        const imgMatch = desc.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)/i);
+        if (imgMatch) imageUrl = imgMatch[1];
+      }
+
       return {
         id: `${roaster}-rss-${i}-${Date.now()}`,
         roaster,
         coffee: title,
         type: detectType(allText),
         process: detectProcess(allText),
-        tastingNotes: extractNotes(allText),
+        tastingNotes: extractNotes(allText, []),
         price: extractPrice(allText),
         date: String(item.pubDate ?? ""),
         link: String(item.link ?? website),
+        imageUrl,
+        isMerch: isMerchandise(title, "", []),
       };
     });
   } catch {
@@ -88,7 +139,6 @@ export function parseFeed(xml: string, roaster: string, website: string): Coffee
   const trimmed = xml.trim();
   if (trimmed.includes("<feed")) return parseAtomFeed(trimmed, roaster, website);
   if (trimmed.includes("<rss")) return parseRssFeed(trimmed, roaster, website);
-  // Try both
   const atom = parseAtomFeed(trimmed, roaster, website);
   if (atom.length > 0) return atom;
   return parseRssFeed(trimmed, roaster, website);
