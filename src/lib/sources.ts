@@ -1,14 +1,11 @@
-import { readFileSync } from "fs";
-import { join } from "path";
+import sourcesData from "../../data/sources.json";
 import { FeedSource } from "./types";
 
 // In-memory source list — initialized from JSON, modifiable at runtime
 let sources: FeedSource[] | null = null;
 
 function loadFromDisk(): FeedSource[] {
-  const raw = readFileSync(join(process.cwd(), "data", "sources.json"), "utf8");
-  const parsed: FeedSource[] = JSON.parse(raw);
-  return parsed.map((s) => ({ ...s, enabled: s.enabled !== false }));
+  return (sourcesData as unknown as FeedSource[]).map((s) => ({ ...s, enabled: s.enabled !== false }));
 }
 
 export function getSources(): FeedSource[] {
