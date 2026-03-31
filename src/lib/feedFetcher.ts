@@ -54,11 +54,18 @@ export async function fetchAllFeeds(): Promise<{
     }
   }
 
-  allEntries.sort((a, b) => {
+  // Filter out entries older than 30 days
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const recent = allEntries.filter((e) => {
+    const d = new Date(e.date).getTime();
+    return !d || d > thirtyDaysAgo; // Keep if date is recent or unparseable
+  });
+
+  recent.sort((a, b) => {
     const da = new Date(a.date).getTime() || 0;
     const db = new Date(b.date).getTime() || 0;
     return db - da;
   });
 
-  return { coffees: allEntries, healthy, failed, total: enabled.length };
+  return { coffees: recent, healthy, failed, total: enabled.length };
 }
