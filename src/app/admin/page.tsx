@@ -3,10 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { FeedSource } from "@/lib/types";
 
+type FilterMode = "all" | "healthy" | "failed" | "unknown";
+
 export default function AdminPage() {
   const [sources, setSources] = useState<FeedSource[]>([]);
+  const [health, setHealth] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [newName, setNewName] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [newWebsite, setNewWebsite] = useState("");
@@ -17,6 +21,7 @@ export default function AdminPage() {
     const res = await fetch("/api/sources");
     const data = await res.json();
     setSources(data.sources);
+    if (data.health) setHealth(data.health);
     setLoading(false);
   }, []);
 
@@ -54,12 +59,25 @@ export default function AdminPage() {
     URL.revokeObjectURL(url);
   }
 
-  const filtered = search
+  function getStatus(url: string): string {
+    return health[url] ?? "unknown";
+  }
+
+  const hasHealth = Object.keys(health).length > 0;
+  const healthyCount = sources.filter((s) => getStatus(s.url) === "ok").length;
+  const failedCount = sources.filter((s) => getStatus(s.url) === "error").length;
+  const unknownCount = sources.length - healthyCount - failedCount;
+
+  let filtered = search
     ? sources.filter((s) =>
         s.name.toLowerCase().includes(search.toLowerCase()) ||
         s.url.toLowerCase().includes(search.toLowerCase())
       )
     : sources;
+
+  if (filterMode === "healthy") filtered = filtered.filter((s) => getStatus(s.url) === "ok");
+  if (filterMode === "failed") filtered = filtered.filter((s) => getStatus(s.url) === "error");
+  if (filterMode === "unknown") filtered = filtered.filter((s) => getStatus(s.url) === "unknown");
 
   const enabledCount = sources.filter((s) => s.enabled !== false).length;
   const disabledCount = sources.length - enabledCount;
@@ -84,10 +102,41 @@ export default function AdminPage() {
             href="/"
             className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition inline-flex items-center"
           >
-            &larr; Back
+            ← Back
           </a>
         </div>
       </div>
+
+      {/* Health summary */}
+      {hasHealth && (
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={() => setFilterMode(filterMode === "all" ? "all" : "all")}
+            className={`px-3 py-1.5 rounded-lg text-xs transition ${filterMode === "all" ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"}`}
+            onClickCapture={() => setFilterMode("all")}
+          >
+            All ({sources.length})
+          </button>
+          <button
+            onClick={() => setFilterMode("healthy")}
+            className={`px-3 py-1.5 rounded-lg text-xs transition ${filterMode === "healthy" ? "bg-emerald-600 text-white" : "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"}`}
+          >
+            Healthy ({healthyCount})
+          </button>
+          <button
+            onClick={() => setFilterMode("failed")}
+            className={`px-3 py-1.5 rounded-lg text-xs transition ${filterMode === "failed" ? "bg-red-600 text-white" : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"}`}
+          >
+            Failed ({failedCount})
+          </button>
+          <button
+            onClick={() => setFilterMode("unknown")}
+            className={`px-3 py-1.5 rounded-lg text-xs transition ${filterMode === "unknown" ? "bg-gray-600 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}`}
+          >
+            Unknown ({unknownCount})
+          </button>
+        </div>
+      )}
 
       {/* Add new source */}
       <form onSubmit={handleAdd} className="mb-6 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
@@ -149,52 +198,74 @@ export default function AdminPage() {
         </div>
       ) : (
         <div className="rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800/50">
-          {filtered.map((source) => (
-            <div
-              key={source.url}
-              className={`flex items-center gap-4 px-4 py-3 ${
-                source.enabled === false ? "opacity-50" : ""
-              }`}
-            >
-              <button
-                onClick={() => doAction("toggle", { url: source.url })}
-                disabled={busy}
-                className={`w-8 h-5 rounded-full transition-colors flex-shrink-0 ${
-                  source.enabled !== false
-                    ? "bg-emerald-500"
-                    : "bg-gray-300 dark:bg-gray-600"
+          {filtered.map((source) => {
+            const status = getStatus(source.url);
+            return (
+              <div
+                key={source.url}
+                className={`flex items-center gap-4 px-4 py-3 ${
+                  source.enabled === false ? "opacity-50" : ""
                 }`}
               >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                    source.enabled !== false ? "translate-x-3.5" : "translate-x-0.5"
+                {/* Health indicator */}
+                <span
+                  className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                    status === "ok"
+                      ? "bg-emerald-500"
+                      : status === "error"
+                      ? "bg-red-400"
+                      : "bg-gray-300 dark:bg-gray-600"
                   }`}
+                  title={status === "ok" ? "Healthy" : status === "error" ? "Failed" : "Not checked"}
                 />
-              </button>
 
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{source.name}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{source.url}</p>
+                {/* Enable/disable toggle */}
+                <button
+                  onClick={() => doAction("toggle", { url: source.url })}
+                  disabled={busy}
+                  className={`w-8 h-5 rounded-full transition-colors flex-shrink-0 ${
+                    source.enabled !== false
+                      ? "bg-emerald-500"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                      source.enabled !== false ? "translate-x-3.5" : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
+
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{source.name}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{source.url}</p>
+                </div>
+
+                {status === "error" && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 flex-shrink-0">
+                    Failed
+                  </span>
+                )}
+
+                <a
+                  href={source.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0"
+                >
+                  Visit
+                </a>
+
+                <button
+                  onClick={() => doAction("remove", { url: source.url })}
+                  disabled={busy}
+                  className="text-xs text-red-400 hover:text-red-600 transition flex-shrink-0"
+                >
+                  Remove
+                </button>
               </div>
-
-              <a
-                href={source.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0"
-              >
-                Visit
-              </a>
-
-              <button
-                onClick={() => doAction("remove", { url: source.url })}
-                disabled={busy}
-                className="text-xs text-red-400 hover:text-red-600 transition flex-shrink-0"
-              >
-                Remove
-              </button>
-            </div>
-          ))}
+            );
+          })}
           {filtered.length === 0 && (
             <p className="px-4 py-8 text-center text-sm text-gray-400">No sources match your search.</p>
           )}

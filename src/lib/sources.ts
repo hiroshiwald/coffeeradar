@@ -40,3 +40,8 @@ export function toggleSource(url: string): FeedSource[] {
   );
   return sources;
 }
+
+// In-memory health for local dev (populated by coffees route refresh)
+let inMemoryHealth: Record<string, string> = {};
+export function setInMemoryHealth(h: Record<string, string>) { inMemoryHealth = h; }
+export function getInMemoryHealth(): Record<string, string> { return inMemoryHealth; }

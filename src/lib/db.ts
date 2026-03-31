@@ -44,6 +44,11 @@ export async function initDb(): Promise<void> {
       total INTEGER DEFAULT 0,
       last_refresh TEXT NOT NULL
     )`,
+    `CREATE TABLE IF NOT EXISTS feed_results (
+      url TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'unknown',
+      last_checked TEXT DEFAULT (datetime('now'))
+    )`,
   ]);
 }
 
@@ -124,4 +129,28 @@ export async function cleanOldEntries(): Promise<number> {
   if (!db) return 0;
   const result = await db.execute(`DELETE FROM coffees WHERE date < datetime('now', '-30 days')`);
   return result.rowsAffected;
+}
+
+export async function saveFeedResults(results: { url: string; status: string }[]): Promise<void> {
+  const db = getClient();
+  if (!db || results.length === 0) return;
+  for (let i = 0; i < results.length; i += 50) {
+    const chunk = results.slice(i, i + 50);
+    const stmts = chunk.map((r) => ({
+      sql: `INSERT OR REPLACE INTO feed_results (url, status, last_checked) VALUES (?, ?, datetime('now'))`,
+      args: [r.url, r.status],
+    }));
+    await db.batch(stmts);
+  }
+}
+
+export async function getFeedResults(): Promise<Record<string, string>> {
+  const db = getClient();
+  if (!db) return {};
+  const result = await db.execute(`SELECT url, status FROM feed_results`);
+  const map: Record<string, string> = {};
+  for (const row of result.rows) {
+    map[String(row.url)] = String(row.status);
+  }
+  return map;
 }

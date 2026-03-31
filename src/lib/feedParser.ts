@@ -7,23 +7,62 @@ const parser = new XMLParser({
   attributeNamePrefix: "@_",
 });
 
+function deepString(val: unknown): string {
+  if (!val) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "number") return String(val);
+  if (Array.isArray(val)) return deepString(val[0]);
+  if (typeof val === "object") {
+    const obj = val as Record<string, unknown>;
+    // Try common keys
+    for (const key of ["s:src", "#text", "@_src", "src", "@_href"]) {
+      if (obj[key]) return deepString(obj[key]);
+    }
+    // Try first string value
+    for (const v of Object.values(obj)) {
+      const s = deepString(v);
+      if (s.startsWith("http")) return s;
+    }
+  }
+  return String(val);
+}
+
 function extractImage(entry: Record<string, unknown>): string {
-  // Shopify s:image element
+  // Shopify s:image element — may contain nested s:src
   const sImage = entry["s:image"];
   if (sImage) {
-    const img = Array.isArray(sImage) ? sImage[0] : sImage;
-    const url = typeof img === "object" && img !== null
-      ? String((img as Record<string, unknown>)["#text"] ?? img)
-      : String(img);
-    if (url && url.startsWith("http")) return url;
+    const items = Array.isArray(sImage) ? sImage : [sImage];
+    for (const item of items) {
+      const url = deepString(item);
+      if (url && url.startsWith("http")) return url;
+    }
   }
 
-  // Image from content HTML: <img src="...">
-  const content = typeof entry.content === "object" && entry.content !== null
+  // Try s:variant images
+  const sVariant = entry["s:variant"];
+  if (sVariant) {
+    const variants = Array.isArray(sVariant) ? sVariant : [sVariant];
+    for (const v of variants) {
+      if (typeof v === "object" && v !== null) {
+        const vObj = v as Record<string, unknown>;
+        if (vObj["s:image"]) {
+          const url = deepString(vObj["s:image"]);
+          if (url && url.startsWith("http")) return url;
+        }
+      }
+    }
+  }
+
+  // Image from content/summary HTML
+  const rawContent = typeof entry.content === "object" && entry.content !== null
     ? String((entry.content as Record<string, unknown>)["#text"] ?? "")
     : String(entry.content ?? "");
-  const imgMatch = content.match(/src=["']([^"']*(?:cdn\.shopify|amazonaws|cloudinary|imgix)[^"']*)/i)
-    || content.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)/i);
+  const rawSummary = String(entry.summary ?? "");
+  const html = `${rawContent} ${rawSummary}`
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+
+  const imgMatch = html.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)/i)
+    || html.match(/src=["']([^"']*(?:cdn\.shopify|amazonaws|cloudinary|imgix)[^"']*)/i);
   if (imgMatch) return imgMatch[1];
 
   return "";

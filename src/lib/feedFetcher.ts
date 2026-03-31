@@ -5,6 +5,11 @@ import { getSources } from "./sources";
 const CONCURRENCY = 25;
 const TIMEOUT = 5000;
 
+export interface FeedResult {
+  url: string;
+  status: "ok" | "error";
+}
+
 interface FetchTarget {
   name: string;
   url: string;
@@ -34,31 +39,36 @@ export async function fetchAllFeeds(): Promise<{
   healthy: number;
   failed: number;
   total: number;
+  feedResults: FeedResult[];
 }> {
   const allSources = getSources();
   const enabled = allSources.filter((s) => s.enabled !== false);
   const allEntries: CoffeeEntry[] = [];
+  const feedResults: FeedResult[] = [];
   let healthy = 0;
   let failed = 0;
 
   for (let i = 0; i < enabled.length; i += CONCURRENCY) {
     const batch = enabled.slice(i, i + CONCURRENCY);
     const results = await Promise.all(batch.map(fetchOne));
-    for (const r of results) {
+    for (let j = 0; j < batch.length; j++) {
+      const r = results[j];
+      const src = batch[j];
       if (r.ok) {
         healthy++;
         allEntries.push(...r.entries);
+        feedResults.push({ url: src.url, status: "ok" });
       } else {
         failed++;
+        feedResults.push({ url: src.url, status: "error" });
       }
     }
   }
 
-  // Filter out entries older than 30 days
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const recent = allEntries.filter((e) => {
     const d = new Date(e.date).getTime();
-    return !d || d > thirtyDaysAgo; // Keep if date is recent or unparseable
+    return !d || d > thirtyDaysAgo;
   });
 
   recent.sort((a, b) => {
@@ -67,5 +77,5 @@ export async function fetchAllFeeds(): Promise<{
     return db - da;
   });
 
-  return { coffees: recent, healthy, failed, total: enabled.length };
+  return { coffees: recent, healthy, failed, total: enabled.length, feedResults };
 }

@@ -81,7 +81,12 @@ async function handleWithoutDb(forceRefresh: boolean): Promise<NextResponse> {
     return NextResponse.json(globalCache.data);
   }
   try {
-    const { coffees, healthy, failed, total } = await fetchAllFeeds();
+    const { coffees, healthy, failed, total, feedResults } = await fetchAllFeeds();
+    // Store per-feed health in memory for admin panel
+    const { setInMemoryHealth } = await import("@/lib/sources");
+    const healthMap: Record<string, string> = {};
+    for (const r of feedResults) healthMap[r.url] = r.status;
+    setInMemoryHealth(healthMap);
     const response: ApiResponse = {
       coffees: coffees.length > 0 ? coffees : FALLBACK_COFFEES,
       meta: { healthy, failed, total, lastRefresh: new Date().toISOString(), isFallback: coffees.length === 0 },

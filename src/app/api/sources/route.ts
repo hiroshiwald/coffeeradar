@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSources, addSource, removeSource, toggleSource } from "@/lib/sources";
+import { getSources, addSource, removeSource, toggleSource, getInMemoryHealth } from "@/lib/sources";
+import { hasTurso, initDb, getFeedResults } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json({ sources: getSources() });
+  let health: Record<string, string> = {};
+  if (hasTurso()) {
+    await initDb();
+    health = await getFeedResults();
+  } else {
+    health = getInMemoryHealth();
+  }
+  return NextResponse.json({ sources: getSources(), health });
 }
 
 export async function POST(request: NextRequest) {

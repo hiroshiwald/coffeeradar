@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDb, upsertCoffees, saveFeedHealth, cleanOldEntries } from "@/lib/db";
+import { initDb, upsertCoffees, saveFeedHealth, saveFeedResults, cleanOldEntries } from "@/lib/db";
 import { fetchAllFeeds } from "@/lib/feedFetcher";
 
 export const maxDuration = 60;
@@ -15,9 +15,10 @@ export async function GET(request: NextRequest) {
 
   try {
     await initDb();
-    const { coffees, healthy, failed, total } = await fetchAllFeeds();
+    const { coffees, healthy, failed, total, feedResults } = await fetchAllFeeds();
     await upsertCoffees(coffees);
     await saveFeedHealth(healthy, failed, total);
+    await saveFeedResults(feedResults);
     const cleaned = await cleanOldEntries();
 
     return NextResponse.json({
