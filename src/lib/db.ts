@@ -1,5 +1,6 @@
 import { createClient, type Client } from "@libsql/client";
-import { CoffeeEntry } from "./types";
+import { CoffeeEntry, FeedSource } from "./types";
+import seedSources from "../../data/sources.json";
 
 let client: Client | null = null;
 
@@ -49,14 +50,87 @@ export async function initDb(): Promise<void> {
       status TEXT NOT NULL DEFAULT 'unknown',
       last_checked TEXT DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS feed_sources (
+      url TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      website TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_feed_sources_enabled ON feed_sources(enabled)`,
   ]);
+
+  const existing = await db.execute(`SELECT COUNT(*) as count FROM feed_sources`);
+  const count = Number(existing.rows[0]?.count ?? 0);
+  if (count === 0) {
+    const seeds = (seedSources as FeedSource[]).map((s) => ({
+      name: s.name,
+      url: s.url,
+      website: s.website || s.url,
+      enabled: s.enabled !== false,
+    }));
+    if (seeds.length > 0) {
+      await db.batch(
+        seeds.map((s) => ({
+          sql: `INSERT OR IGNORE INTO feed_sources (name, url, website, enabled) VALUES (?, ?, ?, ?)`,
+          args: [s.name, s.url, s.website, s.enabled ? 1 : 0],
+        }))
+      );
+    }
+  }
+}
+
+export async function getFeedSources(enabledOnly = false): Promise<FeedSource[]> {
+  const db = getClient();
+  if (!db) return [];
+  const where = enabledOnly ? "WHERE enabled = 1" : "";
+  const result = await db.execute(`SELECT name, url, website, enabled FROM feed_sources ${where} ORDER BY name ASC`);
+  return result.rows.map((row) => ({
+    name: String(row.name),
+    url: String(row.url),
+    website: String(row.website),
+    enabled: Number(row.enabled) === 1,
+  }));
+}
+
+export async function upsertFeedSource(source: FeedSource): Promise<void> {
+  const db = getClient();
+  if (!db) return;
+  await db.execute({
+    sql: `INSERT INTO feed_sources (name, url, website, enabled, updated_at)
+          VALUES (?, ?, ?, ?, datetime('now'))
+          ON CONFLICT(url) DO UPDATE SET
+            name=excluded.name,
+            website=excluded.website,
+            enabled=excluded.enabled,
+            updated_at=datetime('now')`,
+    args: [source.name, source.url, source.website || source.url, source.enabled === false ? 0 : 1],
+  });
+}
+
+export async function removeFeedSource(url: string): Promise<void> {
+  const db = getClient();
+  if (!db) return;
+  await db.execute({ sql: `DELETE FROM feed_sources WHERE url = ?`, args: [url] });
+}
+
+export async function toggleFeedSource(url: string): Promise<void> {
+  const db = getClient();
+  if (!db) return;
+  await db.execute({
+    sql: `UPDATE feed_sources
+          SET enabled = CASE WHEN enabled = 1 THEN 0 ELSE 1 END,
+              updated_at = datetime('now')
+          WHERE url = ?`,
+    args: [url],
+  });
 }
 
 export async function upsertCoffees(entries: CoffeeEntry[]): Promise<void> {
   const db = getClient();
   if (!db || entries.length === 0) return;
 
-  // Batch in chunks of 50
   for (let i = 0; i < entries.length; i += 50) {
     const chunk = entries.slice(i, i + 50);
     const stmts = chunk.map((e) => ({
@@ -129,6 +203,18 @@ export async function cleanOldEntries(): Promise<number> {
   if (!db) return 0;
   const result = await db.execute(`DELETE FROM coffees WHERE date < datetime('now', '-30 days')`);
   return result.rowsAffected;
+}
+
+export async function cleanOldFeedResults(): Promise<number> {
+  const db = getClient();
+  if (!db) return 0;
+  const result = await db.execute(`DELETE FROM feed_results WHERE last_checked < datetime('now', '-30 days')`);
+  return result.rowsAffected;
+}
+
+export async function cleanOldData(): Promise<{ coffees: number; feedResults: number }> {
+  const [coffees, feedResults] = await Promise.all([cleanOldEntries(), cleanOldFeedResults()]);
+  return { coffees, feedResults };
 }
 
 export async function saveFeedResults(results: { url: string; status: string }[]): Promise<void> {

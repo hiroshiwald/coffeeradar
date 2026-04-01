@@ -1,6 +1,6 @@
 import { CoffeeEntry } from "./types";
 import { parseFeed } from "./feedParser";
-import { getSources } from "./sources";
+import { listEnabledMasterSources } from "./sourceStore";
 
 const CONCURRENCY = 25;
 const TIMEOUT = 5000;
@@ -41,8 +41,7 @@ export async function fetchAllFeeds(): Promise<{
   total: number;
   feedResults: FeedResult[];
 }> {
-  const allSources = getSources();
-  const enabled = allSources.filter((s) => s.enabled !== false);
+  const enabled = await listEnabledMasterSources();
   const allEntries: CoffeeEntry[] = [];
   const feedResults: FeedResult[] = [];
   let healthy = 0;
