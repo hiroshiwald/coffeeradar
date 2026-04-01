@@ -28,14 +28,41 @@ function deepString(val: unknown): string {
   return String(val);
 }
 
-function extractImage(entry: Record<string, unknown>): string {
+function normalizeUrl(url: string, website: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("/")) {
+    try {
+      return new URL(trimmed, website).toString();
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+
+function extractText(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (Array.isArray(value)) return extractText(value[0]);
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (obj["#text"] != null) return extractText(obj["#text"]);
+  }
+  return String(value);
+}
+
+function extractImage(entry: Record<string, unknown>, website: string): string {
   // Shopify s:image element — may contain nested s:src
   const sImage = entry["s:image"];
   if (sImage) {
     const items = Array.isArray(sImage) ? sImage : [sImage];
     for (const item of items) {
       const url = deepString(item);
-      if (url && url.startsWith("http")) return url;
+      const normalized = normalizeUrl(url, website);
+      if (normalized) return normalized;
     }
   }
 
@@ -48,7 +75,8 @@ function extractImage(entry: Record<string, unknown>): string {
         const vObj = v as Record<string, unknown>;
         if (vObj["s:image"]) {
           const url = deepString(vObj["s:image"]);
-          if (url && url.startsWith("http")) return url;
+          const normalized = normalizeUrl(url, website);
+          if (normalized) return normalized;
         }
       }
     }
@@ -61,7 +89,8 @@ function extractImage(entry: Record<string, unknown>): string {
     for (const item of items) {
       if (typeof item === "object" && item !== null) {
         const url = String((item as Record<string, unknown>)["@_url"] ?? "");
-        if (url.startsWith("http")) return url;
+        const normalized = normalizeUrl(url, website);
+        if (normalized) return normalized;
       }
     }
   }
@@ -72,30 +101,56 @@ function extractImage(entry: Record<string, unknown>): string {
     for (const item of items) {
       if (typeof item === "object" && item !== null) {
         const url = String((item as Record<string, unknown>)["@_url"] ?? "");
-        if (url.startsWith("http")) return url;
+        const normalized = normalizeUrl(url, website);
+        if (normalized) return normalized;
       }
     }
   }
 
   const googleImage = entry["g:image_link"] ?? entry["image_link"];
   if (googleImage) {
-    const url = deepString(googleImage);
-    if (url.startsWith("http")) return url;
+    const normalized = normalizeUrl(deepString(googleImage), website);
+    if (normalized) return normalized;
   }
 
   // Image from content/summary HTML
   const rawContent = typeof entry.content === "object" && entry.content !== null
     ? String((entry.content as Record<string, unknown>)["#text"] ?? "")
     : String(entry.content ?? "");
-  const rawSummary = String(entry.summary ?? "");
+  const rawSummary = typeof entry.summary === "object" && entry.summary !== null
+    ? String((entry.summary as Record<string, unknown>)["#text"] ?? "")
+    : String(entry.summary ?? "");
   const html = `${rawContent} ${rawSummary}`
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
 
   const imgMatch = html.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp|avif|gif)[^"']*)/i)
     || html.match(/src=["']([^"']*(?:cdn\.shopify|amazonaws|cloudinary|imgix)[^"']*)/i);
-  if (imgMatch) return imgMatch[1];
+  if (imgMatch) return normalizeUrl(imgMatch[1], website);
 
   return "";
+}
+
+function extractShopifyPrice(entry: Record<string, unknown>, allText: string): string {
+  const directPrice = entry["s:price"];
+  if (directPrice) {
+    const directParsed = extractPrice(deepString(directPrice));
+    if (directParsed) return directParsed;
+  }
+
+  const variantsRaw = entry["s:variant"];
+  if (variantsRaw) {
+    const variants = Array.isArray(variantsRaw) ? variantsRaw : [variantsRaw];
+    for (const variant of variants) {
+      if (typeof variant !== "object" || variant === null) continue;
+      const vObj = variant as Record<string, unknown>;
+      const vPrice = vObj["s:price"];
+      if (!vPrice) continue;
+      const parsed = extractPrice(deepString(vPrice));
+      if (parsed) return parsed;
+    }
+  }
+
+  return extractPrice(allText);
 }
 
 function extractShopifyTags(entry: Record<string, unknown>): string[] {
@@ -119,27 +174,16 @@ export function parseAtomFeed(xml: string, roaster: string, website: string): Co
     const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
 
     return entries.map((e: Record<string, unknown>, i: number) => {
-      const title = String(e.title ?? "");
-      const summary = String(e.summary ?? "");
-      const content = typeof e.content === "object" && e.content !== null
-        ? String((e.content as Record<string, unknown>)["#text"] ?? "")
-        : String(e.content ?? "");
+      const title = extractText(e.title);
+      const summary = extractText(e.summary);
+      const content = extractText(e.content);
 
       const shopifyTags = extractShopifyTags(e);
       const productType = extractProductType(e);
       const allText = `${title} ${summary} ${content} ${shopifyTags.join(" ")} ${productType}`;
 
       // Extract price from s:price or s:variant or content
-      let price = "";
-      const sPrice = e["s:price"] ?? (e as Record<string, unknown>)["s:variant"];
-      if (sPrice) {
-        const sp = Array.isArray(sPrice) ? sPrice[0] : sPrice;
-        const spVal = typeof sp === "object" && sp !== null
-          ? String((sp as Record<string, unknown>)["s:price"] ?? sp)
-          : String(sp);
-        price = extractPrice(spVal);
-      }
-      if (!price) price = extractPrice(allText);
+      const price = extractShopifyPrice(e, allText);
 
       const link = typeof e.link === "object" && e.link !== null
         ? String((e.link as Record<string, unknown>)["@_href"] ?? website)
@@ -148,14 +192,14 @@ export function parseAtomFeed(xml: string, roaster: string, website: string): Co
       return {
         id: `${roaster}-${i}-${Date.now()}`,
         roaster,
-        coffee: title,
+        coffee: extractText(e.title),
         type: detectType(allText),
         process: detectProcess(allText),
         tastingNotes: extractNotes(allText, shopifyTags),
         price,
         date: String(e.published ?? e.updated ?? ""),
         link,
-        imageUrl: extractImage(e),
+        imageUrl: extractImage(e, website),
         isMerch: isMerchandise(title, productType, shopifyTags),
       };
     });
@@ -172,17 +216,18 @@ export function parseRssFeed(xml: string, roaster: string, website: string): Cof
     const items = Array.isArray(channel.item) ? channel.item : [channel.item];
 
     return items.map((item: Record<string, unknown>, i: number) => {
-      const title = String(item.title ?? "");
-      const desc = String(item.description ?? "");
+      const title = extractText(item.title);
+      const desc = extractText(item.description);
       const allText = `${title} ${desc}`;
 
       // Try to get image from description or enclosure
       let imageUrl = "";
       const enclosure = item.enclosure as Record<string, unknown> | undefined;
-      if (enclosure?.["@_url"]) imageUrl = String(enclosure["@_url"]);
+      if (enclosure?.["@_url"]) imageUrl = normalizeUrl(String(enclosure["@_url"]), website);
       if (!imageUrl) {
-        const imgMatch = desc.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)/i);
-        if (imgMatch) imageUrl = imgMatch[1];
+        const imgMatch = desc.match(/src=["']((?:https?:)?\/\/[^"']+\.(?:jpg|jpeg|png|webp|avif|gif)[^"']*)/i)
+          || desc.match(/src=["']([^"']*(?:cdn\.shopify|amazonaws|cloudinary|imgix)[^"']*)/i);
+        if (imgMatch) imageUrl = normalizeUrl(imgMatch[1], website);
       }
 
       return {
