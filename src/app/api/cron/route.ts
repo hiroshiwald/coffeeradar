@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
       total,
       cleanedCoffees: cleaned.coffees,
       cleanedFeedResults: cleaned.feedResults,
+      cleanedDuplicateCoffees: cleaned.duplicateCoffees,
     });
   } catch (err) {
     return NextResponse.json(

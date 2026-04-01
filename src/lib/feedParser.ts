@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { XMLParser } from "fast-xml-parser";
 import { CoffeeEntry } from "./types";
 import { detectType, detectProcess, extractNotes, extractPrice, isMerchandise } from "./heuristics";
@@ -181,6 +182,12 @@ function extractShopifyTags(entry: Record<string, unknown>): string[] {
   return arr.map((t) => String(t)).filter(Boolean);
 }
 
+
+function buildStableId(roaster: string, urlOrTitle: string, publishedAt: string, fallback: string): string {
+  const normalized = [roaster.trim().toLowerCase(), urlOrTitle.trim().toLowerCase(), publishedAt.trim(), fallback.trim().toLowerCase()].join("|");
+  return createHash("sha1").update(normalized).digest("hex");
+}
+
 function extractProductType(entry: Record<string, unknown>): string {
   const pt = entry["s:type"] ?? entry["s:product-type"];
   if (pt) return String(pt);
@@ -219,15 +226,18 @@ export function parseAtomFeed(xml: string, roaster: string, website: string): Co
         link = e.link;
       }
 
+      const publishedAt = String(e.published ?? e.updated ?? "");
+      const stableId = buildStableId(roaster, link, publishedAt, title || String(i));
+
       return {
-        id: `${roaster}-${i}-${Date.now()}`,
+        id: stableId,
         roaster,
         coffee: title,
         type: detectType(allText),
         process: detectProcess(allText),
         tastingNotes: extractNotes(allText, shopifyTags),
         price,
-        date: String(e.published ?? e.updated ?? ""),
+        date: publishedAt,
         link,
         imageUrl: extractImage(e),
         isMerch: isMerchandise(title, productType, shopifyTags),
@@ -259,16 +269,20 @@ export function parseRssFeed(xml: string, roaster: string, website: string): Cof
         imageUrl = extractImage(item);
       }
 
+      const publishedAt = String(item.pubDate ?? "");
+      const link = String(item.link ?? website);
+      const stableId = buildStableId(roaster, link, publishedAt, title || String(i));
+
       return {
-        id: `${roaster}-rss-${i}-${Date.now()}`,
+        id: stableId,
         roaster,
         coffee: title,
         type: detectType(allText),
         process: detectProcess(allText),
         tastingNotes: extractNotes(allText, []),
         price: extractPrice(allText),
-        date: String(item.pubDate ?? ""),
-        link: String(item.link ?? website),
+        date: publishedAt,
+        link,
         imageUrl,
         isMerch: isMerchandise(title, "", []),
       };

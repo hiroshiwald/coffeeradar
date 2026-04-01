@@ -38,6 +38,7 @@ export async function initDb(): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_coffees_date ON coffees(date)`,
     `CREATE INDEX IF NOT EXISTS idx_coffees_type ON coffees(type)`,
     `CREATE INDEX IF NOT EXISTS idx_coffees_is_merch ON coffees(is_merch)`,
+    `CREATE INDEX IF NOT EXISTS idx_coffees_identity ON coffees(roaster, coffee, link, date)`,
     `CREATE TABLE IF NOT EXISTS feed_health (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       healthy INTEGER DEFAULT 0,
@@ -212,9 +213,27 @@ export async function cleanOldFeedResults(): Promise<number> {
   return result.rowsAffected;
 }
 
-export async function cleanOldData(): Promise<{ coffees: number; feedResults: number }> {
-  const [coffees, feedResults] = await Promise.all([cleanOldEntries(), cleanOldFeedResults()]);
-  return { coffees, feedResults };
+export async function cleanDuplicateCoffees(): Promise<number> {
+  const db = getClient();
+  if (!db) return 0;
+  const result = await db.execute(`
+    DELETE FROM coffees
+    WHERE rowid NOT IN (
+      SELECT MAX(rowid)
+      FROM coffees
+      GROUP BY roaster, coffee, link, date
+    )
+  `);
+  return result.rowsAffected;
+}
+
+export async function cleanOldData(): Promise<{ coffees: number; feedResults: number; duplicateCoffees: number }> {
+  const [coffees, feedResults, duplicateCoffees] = await Promise.all([
+    cleanOldEntries(),
+    cleanOldFeedResults(),
+    cleanDuplicateCoffees(),
+  ]);
+  return { coffees, feedResults, duplicateCoffees };
 }
 
 export async function saveFeedResults(results: { url: string; status: string }[]): Promise<void> {
