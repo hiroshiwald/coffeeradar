@@ -203,9 +203,11 @@ export function extractNotes(text: string, shopifyTags: string[]): string[] {
 }
 
 export function extractPrice(text: string): string {
-  const priceMatch = text.match(/[\$£€]?\s?(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)/);
-  if (priceMatch) {
-    const num = parseFloat(priceMatch[1].replace(/,/g, ""));
+  const matches = text.matchAll(/[\$£€]\s?(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)|(\d{1,4}(?:,\d{3})*(?:\.\d{2})?)\s?[\$£€]?/g);
+  for (const match of matches) {
+    const candidate = match[1] ?? match[2];
+    if (!candidate) continue;
+    const num = parseFloat(candidate.replace(/,/g, ""));
     if (num > 5 && num < 200) return `$${num.toFixed(2)}`;
   }
   return "";
