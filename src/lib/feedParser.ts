@@ -8,6 +8,15 @@ const parser = new XMLParser({
   parseTagValue: false,
 });
 
+function decodeHtml(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 function deepString(val: unknown): string {
   if (!val) return "";
   if (typeof val === "string") return val;
@@ -26,6 +35,44 @@ function deepString(val: unknown): string {
     }
   }
   return String(val);
+}
+
+function deepText(val: unknown): string {
+  if (val == null) return "";
+  if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") {
+    return String(val);
+  }
+  if (Array.isArray(val)) {
+    return val.map(deepText).filter(Boolean).join(" ");
+  }
+  if (typeof val === "object") {
+    const obj = val as Record<string, unknown>;
+    const preferred = ["#text", "@_value", "content:encoded", "description", "summary", "title"];
+    for (const k of preferred) {
+      if (obj[k]) {
+        const out = deepText(obj[k]);
+        if (out) return out;
+      }
+    }
+    return Object.values(obj).map(deepText).filter(Boolean).join(" ");
+  }
+  return "";
+}
+
+function extractImageFromHtml(html: string): string {
+  const normalized = decodeHtml(html);
+  const patterns = [
+    /<meta[^>]+property=["']og:image["'][^>]+content=["'](https?:\/\/[^"']+)["']/i,
+    /<img[^>]+src=["'](https?:\/\/[^"']+)["']/i,
+    /<img[^>]+data-src=["'](https?:\/\/[^"']+)["']/i,
+    /<img[^>]+srcset=["'](https?:\/\/[^"'\s,]+)[^"']*["']/i,
+    /src=["']([^"']*(?:cdn\.shopify|amazonaws|cloudinary|imgix)[^"']*)["']/i,
+  ];
+  for (const p of patterns) {
+    const m = normalized.match(p);
+    if (m?.[1]) return m[1];
+  }
+  return "";
 }
 
 function extractImage(entry: Record<string, unknown>): string {
@@ -77,6 +124,12 @@ function extractImage(entry: Record<string, unknown>): string {
     }
   }
 
+  const itunesImage = entry["itunes:image"];
+  if (itunesImage && typeof itunesImage === "object" && itunesImage !== null) {
+    const href = String((itunesImage as Record<string, unknown>)["@_href"] ?? "");
+    if (href.startsWith("http")) return href;
+  }
+
   const googleImage = entry["g:image_link"] ?? entry["image_link"];
   if (googleImage) {
     const url = deepString(googleImage);
@@ -84,23 +137,21 @@ function extractImage(entry: Record<string, unknown>): string {
   }
 
   // Image from content/summary HTML
-  const rawContent = typeof entry.content === "object" && entry.content !== null
-    ? String((entry.content as Record<string, unknown>)["#text"] ?? "")
-    : String(entry.content ?? "");
-  const rawSummary = typeof entry.summary === "object" && entry.summary !== null
-    ? String((entry.summary as Record<string, unknown>)["#text"] ?? "")
-    : String(entry.summary ?? "");
-  const html = `${rawContent} ${rawSummary}`
-    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
-
-  const imgMatch = html.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp|avif|gif)[^"']*)/i)
-    || html.match(/src=["']([^"']*(?:cdn\.shopify|amazonaws|cloudinary|imgix)[^"']*)/i);
-  if (imgMatch) return imgMatch[1];
+  const html = `${deepText(entry.content)} ${deepText(entry.summary)} ${deepText(entry["content:encoded"])}`;
+  const htmlImage = extractImageFromHtml(html);
+  if (htmlImage) return htmlImage;
 
   return "";
 }
 
 function extractShopifyPrice(entry: Record<string, unknown>, allText: string): string {
+  const directKeys = ["g:price", "price", "woocommerce:price", "p:price"];
+  for (const key of directKeys) {
+    if (!entry[key]) continue;
+    const parsed = extractPrice(deepText(entry[key]));
+    if (parsed) return parsed;
+  }
+
   const directPrice = entry["s:price"];
   if (directPrice) {
     const directParsed = extractPrice(deepString(directPrice));
@@ -144,22 +195,29 @@ export function parseAtomFeed(xml: string, roaster: string, website: string): Co
     const entries = Array.isArray(feed.entry) ? feed.entry : [feed.entry];
 
     return entries.map((e: Record<string, unknown>, i: number) => {
-      const title = String(e.title ?? "");
-      const summary = String(e.summary ?? "");
-      const content = typeof e.content === "object" && e.content !== null
-        ? String((e.content as Record<string, unknown>)["#text"] ?? "")
-        : String(e.content ?? "");
+      const title = deepText(e.title);
+      const summary = deepText(e.summary);
+      const content = deepText(e.content);
+      const encoded = deepText(e["content:encoded"]);
 
       const shopifyTags = extractShopifyTags(e);
       const productType = extractProductType(e);
-      const allText = `${title} ${summary} ${content} ${shopifyTags.join(" ")} ${productType}`;
+      const allText = `${title} ${summary} ${content} ${encoded} ${shopifyTags.join(" ")} ${productType}`;
 
       // Extract price from s:price or s:variant or content
       const price = extractShopifyPrice(e, allText);
 
-      const link = typeof e.link === "object" && e.link !== null
-        ? String((e.link as Record<string, unknown>)["@_href"] ?? website)
-        : website;
+      let link = website;
+      if (Array.isArray(e.link)) {
+        const firstHref = e.link
+          .map((x) => (typeof x === "object" && x !== null ? String((x as Record<string, unknown>)["@_href"] ?? "") : ""))
+          .find((x) => x.startsWith("http"));
+        if (firstHref) link = firstHref;
+      } else if (typeof e.link === "object" && e.link !== null) {
+        link = String((e.link as Record<string, unknown>)["@_href"] ?? website);
+      } else if (typeof e.link === "string" && e.link.startsWith("http")) {
+        link = e.link;
+      }
 
       return {
         id: `${roaster}-${i}-${Date.now()}`,
@@ -188,17 +246,17 @@ export function parseRssFeed(xml: string, roaster: string, website: string): Cof
     const items = Array.isArray(channel.item) ? channel.item : [channel.item];
 
     return items.map((item: Record<string, unknown>, i: number) => {
-      const title = String(item.title ?? "");
-      const desc = String(item.description ?? "");
-      const allText = `${title} ${desc}`;
+      const title = deepText(item.title);
+      const desc = deepText(item.description);
+      const encoded = deepText(item["content:encoded"]);
+      const allText = `${title} ${desc} ${encoded} ${deepText(item["g:price"])} ${deepText(item.price)}`;
 
       // Try to get image from description or enclosure
       let imageUrl = "";
       const enclosure = item.enclosure as Record<string, unknown> | undefined;
       if (enclosure?.["@_url"]) imageUrl = String(enclosure["@_url"]);
       if (!imageUrl) {
-        const imgMatch = desc.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)/i);
-        if (imgMatch) imageUrl = imgMatch[1];
+        imageUrl = extractImage(item);
       }
 
       return {
