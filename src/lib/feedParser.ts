@@ -87,7 +87,9 @@ function extractImage(entry: Record<string, unknown>): string {
   const rawContent = typeof entry.content === "object" && entry.content !== null
     ? String((entry.content as Record<string, unknown>)["#text"] ?? "")
     : String(entry.content ?? "");
-  const rawSummary = String(entry.summary ?? "");
+  const rawSummary = typeof entry.summary === "object" && entry.summary !== null
+    ? String((entry.summary as Record<string, unknown>)["#text"] ?? "")
+    : String(entry.summary ?? "");
   const html = `${rawContent} ${rawSummary}`
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
 
@@ -96,6 +98,29 @@ function extractImage(entry: Record<string, unknown>): string {
   if (imgMatch) return imgMatch[1];
 
   return "";
+}
+
+function extractShopifyPrice(entry: Record<string, unknown>, allText: string): string {
+  const directPrice = entry["s:price"];
+  if (directPrice) {
+    const directParsed = extractPrice(deepString(directPrice));
+    if (directParsed) return directParsed;
+  }
+
+  const variantsRaw = entry["s:variant"];
+  if (variantsRaw) {
+    const variants = Array.isArray(variantsRaw) ? variantsRaw : [variantsRaw];
+    for (const variant of variants) {
+      if (typeof variant !== "object" || variant === null) continue;
+      const vObj = variant as Record<string, unknown>;
+      const vPrice = vObj["s:price"];
+      if (!vPrice) continue;
+      const parsed = extractPrice(deepString(vPrice));
+      if (parsed) return parsed;
+    }
+  }
+
+  return extractPrice(allText);
 }
 
 function extractShopifyTags(entry: Record<string, unknown>): string[] {
@@ -130,16 +155,7 @@ export function parseAtomFeed(xml: string, roaster: string, website: string): Co
       const allText = `${title} ${summary} ${content} ${shopifyTags.join(" ")} ${productType}`;
 
       // Extract price from s:price or s:variant or content
-      let price = "";
-      const sPrice = e["s:price"] ?? (e as Record<string, unknown>)["s:variant"];
-      if (sPrice) {
-        const sp = Array.isArray(sPrice) ? sPrice[0] : sPrice;
-        const spVal = typeof sp === "object" && sp !== null
-          ? String((sp as Record<string, unknown>)["s:price"] ?? sp)
-          : String(sp);
-        price = extractPrice(spVal);
-      }
-      if (!price) price = extractPrice(allText);
+      const price = extractShopifyPrice(e, allText);
 
       const link = typeof e.link === "object" && e.link !== null
         ? String((e.link as Record<string, unknown>)["@_href"] ?? website)
