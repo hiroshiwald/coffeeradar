@@ -1,0 +1,205 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { FeedSource } from "@/lib/types";
+
+type FilterMode = "all" | "healthy" | "failed" | "unknown";
+
+export default function OwnerFeedsPage() {
+  const [sources, setSources] = useState<FeedSource[]>([]);
+  const [health, setHealth] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  const [newName, setNewName] = useState("");
+  const [newUrl, setNewUrl] = useState("");
+  const [newWebsite, setNewWebsite] = useState("");
+  const [storeName, setStoreName] = useState("");
+  const [storeUrl, setStoreUrl] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const fetchSources = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch("/api/admin/sources");
+    const data = await res.json();
+    setSources(data.sources ?? []);
+    if (data.health) setHealth(data.health);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchSources(); }, [fetchSources]);
+
+  async function doAction(action: string, payload: Record<string, string>) {
+    setBusy(true);
+    setStatusMessage("");
+    const res = await fetch("/api/admin/sources", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const data = await res.json();
+    if (data.sources) setSources(data.sources);
+
+    if (!res.ok) {
+      setStatusMessage(data.error ?? "Action failed.");
+    } else if (data.discovery?.message) {
+      setStatusMessage(data.discovery.message);
+    } else {
+      setStatusMessage("Saved.");
+    }
+    setBusy(false);
+  }
+
+  async function handleAddFeed(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newName || !newUrl) return;
+    await doAction("add", { name: newName, url: newUrl, website: newWebsite || newUrl });
+    setNewName("");
+    setNewUrl("");
+    setNewWebsite("");
+  }
+
+  async function handleAddFromStore(e: React.FormEvent) {
+    e.preventDefault();
+    if (!storeName || !storeUrl) return;
+    await doAction("add_from_store", { name: storeName, storeUrl });
+    setStoreName("");
+    setStoreUrl("");
+  }
+
+  function handleExportCsv() {
+    window.location.href = "/api/admin/sources/csv";
+  }
+
+  function getStatus(url: string): string {
+    return health[url] ?? "unknown";
+  }
+
+  const hasHealth = Object.keys(health).length > 0;
+  const healthyCount = sources.filter((s) => getStatus(s.url) === "ok").length;
+  const failedCount = sources.filter((s) => getStatus(s.url) === "error").length;
+  const unknownCount = sources.length - healthyCount - failedCount;
+
+  let filtered = search
+    ? sources.filter((s) =>
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.url.toLowerCase().includes(search.toLowerCase())
+    )
+    : sources;
+
+  if (filterMode === "healthy") filtered = filtered.filter((s) => getStatus(s.url) === "ok");
+  if (filterMode === "failed") filtered = filtered.filter((s) => getStatus(s.url) === "error");
+  if (filterMode === "unknown") filtered = filtered.filter((s) => getStatus(s.url) === "unknown");
+
+  const enabledCount = sources.filter((s) => s.enabled !== false).length;
+  const disabledCount = sources.length - enabledCount;
+
+  return (
+    <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-light tracking-tight">Owner Feed Admin</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            MASTER list: {sources.length} sources ({enabledCount} enabled, {disabledCount} disabled)
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportCsv}
+            className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+          >
+            Download CSV
+          </button>
+          <a
+            href="/"
+            className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition inline-flex items-center"
+          >
+            ← Back
+          </a>
+        </div>
+      </div>
+
+      {statusMessage && (
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">{statusMessage}</p>
+      )}
+
+      {hasHealth && (
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={() => setFilterMode("all")}
+            className={`px-3 py-1.5 rounded-lg text-xs transition ${filterMode === "all" ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"}`}
+          >
+            All ({sources.length})
+          </button>
+          <button
+            onClick={() => setFilterMode("healthy")}
+            className={`px-3 py-1.5 rounded-lg text-xs transition ${filterMode === "healthy" ? "bg-emerald-600 text-white" : "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"}`}
+          >
+            Healthy ({healthyCount})
+          </button>
+          <button
+            onClick={() => setFilterMode("failed")}
+            className={`px-3 py-1.5 rounded-lg text-xs transition ${filterMode === "failed" ? "bg-red-600 text-white" : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"}`}
+          >
+            Failed ({failedCount})
+          </button>
+          <button
+            onClick={() => setFilterMode("unknown")}
+            className={`px-3 py-1.5 rounded-lg text-xs transition ${filterMode === "unknown" ? "bg-gray-600 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}`}
+          >
+            Unknown ({unknownCount})
+          </button>
+        </div>
+      )}
+
+      <form onSubmit={handleAddFromStore} className="mb-4 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+        <p className="text-sm font-medium mb-3">Quick Add by Roaster Store URL</p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input type="text" placeholder="Roaster name" value={storeName} onChange={(e) => setStoreName(e.target.value)} className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm" required />
+          <input type="url" placeholder="Store URL" value={storeUrl} onChange={(e) => setStoreUrl(e.target.value)} className="flex-[2] px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm" required />
+          <button type="submit" disabled={busy} className="px-4 py-2 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm disabled:opacity-50">Discover + Add</button>
+        </div>
+      </form>
+
+      <form onSubmit={handleAddFeed} className="mb-6 p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+        <p className="text-sm font-medium mb-3">Manual Add by Feed URL</p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input type="text" placeholder="Roaster name" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm" required />
+          <input type="url" placeholder="Feed URL (.atom or rss)" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} className="flex-[2] px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm" required />
+          <input type="url" placeholder="Website (optional)" value={newWebsite} onChange={(e) => setNewWebsite(e.target.value)} className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm" />
+          <button type="submit" disabled={busy} className="px-4 py-2 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm disabled:opacity-50">Add</button>
+        </div>
+      </form>
+
+      <div className="relative mb-4">
+        <input
+          type="text"
+          placeholder="Search sources..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-4 pr-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+        />
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-14 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />)}</div>
+      ) : (
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800/50">
+          {filtered.map((source) => {
+            const status = getStatus(source.url);
+            return (
+              <div key={source.url} className={`flex items-center gap-4 px-4 py-3 ${source.enabled === false ? "opacity-50" : ""}`}>
+                <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${status === "ok" ? "bg-emerald-500" : status === "error" ? "bg-red-400" : "bg-gray-300 dark:bg-gray-600"}`} />
+                <button onClick={() => doAction("toggle", { url: source.url })} disabled={busy} className={`w-8 h-5 rounded-full transition-colors flex-shrink-0 ${source.enabled !== false ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600"}`}><div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${source.enabled !== false ? "translate-x-3.5" : "translate-x-0.5"}`} /></button>
+                <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{source.name}</p><p className="text-xs text-gray-400 dark:text-gray-500 truncate">{source.url}</p></div>
+                <a href={source.website} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0">Visit</a>
+                <button onClick={() => doAction("remove", { url: source.url })} disabled={busy} className="text-xs text-red-400 hover:text-red-600 transition flex-shrink-0">Remove</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

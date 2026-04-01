@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDb, upsertCoffees, saveFeedHealth, saveFeedResults, cleanOldEntries } from "@/lib/db";
+import { initDb, upsertCoffees, saveFeedHealth, saveFeedResults, cleanOldData } from "@/lib/db";
 import { fetchAllFeeds } from "@/lib/feedFetcher";
 
 export const maxDuration = 60;
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     await upsertCoffees(coffees);
     await saveFeedHealth(healthy, failed, total);
     await saveFeedResults(feedResults);
-    const cleaned = await cleanOldEntries();
+    const cleaned = await cleanOldData();
 
     return NextResponse.json({
       ok: true,
@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
       healthy,
       failed,
       total,
-      cleaned,
+      cleanedCoffees: cleaned.coffees,
+      cleanedFeedResults: cleaned.feedResults,
     });
   } catch (err) {
     return NextResponse.json(
