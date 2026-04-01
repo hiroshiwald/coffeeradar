@@ -11,7 +11,7 @@ export const FALLBACK_COFFEES: CoffeeEntry[] = [
     price: "$22.00",
     date: new Date().toISOString(),
     link: "#",
-    imageUrl: "",
+    imageUrl: "https://placehold.co/80x80/png?text=Coffee+1",
     isMerch: false,
   },
   {
@@ -24,7 +24,7 @@ export const FALLBACK_COFFEES: CoffeeEntry[] = [
     price: "$24.00",
     date: new Date().toISOString(),
     link: "#",
-    imageUrl: "",
+    imageUrl: "https://placehold.co/80x80/png?text=Coffee+2",
     isMerch: false,
   },
   {
@@ -37,7 +37,7 @@ export const FALLBACK_COFFEES: CoffeeEntry[] = [
     price: "$18.00",
     date: new Date().toISOString(),
     link: "#",
-    imageUrl: "",
+    imageUrl: "https://placehold.co/80x80/png?text=Coffee+3",
     isMerch: false,
   },
   {
@@ -50,7 +50,7 @@ export const FALLBACK_COFFEES: CoffeeEntry[] = [
     price: "$26.00",
     date: new Date().toISOString(),
     link: "#",
-    imageUrl: "",
+    imageUrl: "https://placehold.co/80x80/png?text=Coffee+4",
     isMerch: false,
   },
   {
@@ -63,7 +63,7 @@ export const FALLBACK_COFFEES: CoffeeEntry[] = [
     price: "$20.00",
     date: new Date().toISOString(),
     link: "#",
-    imageUrl: "",
+    imageUrl: "https://placehold.co/80x80/png?text=Coffee+5",
     isMerch: false,
   },
 ];

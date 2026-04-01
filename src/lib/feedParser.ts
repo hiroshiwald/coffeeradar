@@ -5,6 +5,7 @@ import { detectType, detectProcess, extractNotes, extractPrice, isMerchandise } 
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
+  parseTagValue: false,
 });
 
 function deepString(val: unknown): string {
@@ -53,6 +54,35 @@ function extractImage(entry: Record<string, unknown>): string {
     }
   }
 
+  // Common RSS/Atom media tags
+  const mediaContent = entry["media:content"];
+  if (mediaContent) {
+    const items = Array.isArray(mediaContent) ? mediaContent : [mediaContent];
+    for (const item of items) {
+      if (typeof item === "object" && item !== null) {
+        const url = String((item as Record<string, unknown>)["@_url"] ?? "");
+        if (url.startsWith("http")) return url;
+      }
+    }
+  }
+
+  const mediaThumbnail = entry["media:thumbnail"];
+  if (mediaThumbnail) {
+    const items = Array.isArray(mediaThumbnail) ? mediaThumbnail : [mediaThumbnail];
+    for (const item of items) {
+      if (typeof item === "object" && item !== null) {
+        const url = String((item as Record<string, unknown>)["@_url"] ?? "");
+        if (url.startsWith("http")) return url;
+      }
+    }
+  }
+
+  const googleImage = entry["g:image_link"] ?? entry["image_link"];
+  if (googleImage) {
+    const url = deepString(googleImage);
+    if (url.startsWith("http")) return url;
+  }
+
   // Image from content/summary HTML
   const rawContent = typeof entry.content === "object" && entry.content !== null
     ? String((entry.content as Record<string, unknown>)["#text"] ?? "")
@@ -61,7 +91,7 @@ function extractImage(entry: Record<string, unknown>): string {
   const html = `${rawContent} ${rawSummary}`
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
 
-  const imgMatch = html.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)/i)
+  const imgMatch = html.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp|avif|gif)[^"']*)/i)
     || html.match(/src=["']([^"']*(?:cdn\.shopify|amazonaws|cloudinary|imgix)[^"']*)/i);
   if (imgMatch) return imgMatch[1];
 
