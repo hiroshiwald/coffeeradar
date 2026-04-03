@@ -19,6 +19,13 @@ export interface CoffeeEntry {
   isMerch: boolean;
 }
 
+export interface SiteUser {
+  username: string;
+  passwordHash: string;
+  salt: string;
+  createdAt: string;
+}
+
 export interface ApiResponse {
   coffees: CoffeeEntry[];
   meta: {

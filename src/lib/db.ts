@@ -1,5 +1,5 @@
 import { createClient, type Client } from "@libsql/client";
-import { CoffeeEntry, FeedSource } from "./types";
+import { CoffeeEntry, FeedSource, SiteUser } from "./types";
 import seedSources from "../../data/sources.json";
 
 let client: Client | null = null;
@@ -60,6 +60,16 @@ export async function initDb(): Promise<void> {
       updated_at TEXT DEFAULT (datetime('now'))
     )`,
     `CREATE INDEX IF NOT EXISTS idx_feed_sources_enabled ON feed_sources(enabled)`,
+    `CREATE TABLE IF NOT EXISTS site_users (
+      username TEXT PRIMARY KEY,
+      password_hash TEXT NOT NULL,
+      salt TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS site_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )`,
   ]);
 
   const existing = await db.execute(`SELECT COUNT(*) as count FROM feed_sources`);
@@ -258,4 +268,77 @@ export async function getFeedResults(): Promise<Record<string, string>> {
     map[String(row.url)] = String(row.status);
   }
   return map;
+}
+
+// --- Site Users ---
+
+export async function dbGetSiteUsers(): Promise<SiteUser[]> {
+  const db = getClient();
+  if (!db) return [];
+  const result = await db.execute(`SELECT username, password_hash, salt, created_at FROM site_users ORDER BY created_at ASC`);
+  return result.rows.map((row) => ({
+    username: String(row.username),
+    passwordHash: String(row.password_hash),
+    salt: String(row.salt),
+    createdAt: String(row.created_at),
+  }));
+}
+
+export async function dbGetSiteUserByUsername(username: string): Promise<SiteUser | null> {
+  const db = getClient();
+  if (!db) return null;
+  const result = await db.execute({ sql: `SELECT username, password_hash, salt, created_at FROM site_users WHERE username = ?`, args: [username] });
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  return {
+    username: String(row.username),
+    passwordHash: String(row.password_hash),
+    salt: String(row.salt),
+    createdAt: String(row.created_at),
+  };
+}
+
+export async function dbAddSiteUser(user: SiteUser): Promise<void> {
+  const db = getClient();
+  if (!db) return;
+  await db.execute({
+    sql: `INSERT OR REPLACE INTO site_users (username, password_hash, salt, created_at) VALUES (?, ?, ?, ?)`,
+    args: [user.username, user.passwordHash, user.salt, user.createdAt || new Date().toISOString()],
+  });
+}
+
+export async function dbRemoveSiteUser(username: string): Promise<void> {
+  const db = getClient();
+  if (!db) return;
+  await db.execute({ sql: `DELETE FROM site_users WHERE username = ?`, args: [username] });
+}
+
+// --- Site Settings ---
+
+let siteProtectionCache: { value: boolean; ts: number } | null = null;
+
+export async function dbGetSiteProtection(): Promise<boolean> {
+  if (siteProtectionCache && Date.now() - siteProtectionCache.ts < 60_000) {
+    return siteProtectionCache.value;
+  }
+  const db = getClient();
+  if (!db) return false;
+  const result = await db.execute({ sql: `SELECT value FROM site_settings WHERE key = ?`, args: ["site_protection_enabled"] });
+  const enabled = result.rows.length > 0 && String(result.rows[0].value) === "true";
+  siteProtectionCache = { value: enabled, ts: Date.now() };
+  return enabled;
+}
+
+export async function dbSetSiteProtection(enabled: boolean): Promise<void> {
+  const db = getClient();
+  if (!db) return;
+  await db.execute({
+    sql: `INSERT OR REPLACE INTO site_settings (key, value) VALUES (?, ?)`,
+    args: ["site_protection_enabled", enabled ? "true" : "false"],
+  });
+  siteProtectionCache = { value: enabled, ts: Date.now() };
+}
+
+export function invalidateSiteProtectionCache(): void {
+  siteProtectionCache = null;
 }

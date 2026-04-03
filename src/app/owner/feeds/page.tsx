@@ -5,6 +5,11 @@ import { FeedSource } from "@/lib/types";
 
 type FilterMode = "all" | "healthy" | "failed" | "unknown";
 
+interface SiteUserInfo {
+  username: string;
+  createdAt: string;
+}
+
 export default function OwnerFeedsPage() {
   const [sources, setSources] = useState<FeedSource[]>([]);
   const [health, setHealth] = useState<Record<string, string>>({});
@@ -19,6 +24,13 @@ export default function OwnerFeedsPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Site access control state
+  const [siteUsers, setSiteUsers] = useState<SiteUserInfo[]>([]);
+  const [protectionEnabled, setProtectionEnabled] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [authStatusMessage, setAuthStatusMessage] = useState("");
+
   const fetchSources = useCallback(async () => {
     setLoading(true);
     const res = await fetch("/api/admin/sources");
@@ -28,7 +40,14 @@ export default function OwnerFeedsPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchSources(); }, [fetchSources]);
+  const fetchSiteAuth = useCallback(async () => {
+    const res = await fetch("/api/admin/site-auth");
+    const data = await res.json();
+    setSiteUsers(data.users ?? []);
+    setProtectionEnabled(data.protectionEnabled ?? false);
+  }, []);
+
+  useEffect(() => { fetchSources(); fetchSiteAuth(); }, [fetchSources, fetchSiteAuth]);
 
   async function doAction(action: string, payload: Record<string, string>) {
     setBusy(true);
@@ -51,6 +70,26 @@ export default function OwnerFeedsPage() {
     setBusy(false);
   }
 
+  async function doAuthAction(action: string, payload: Record<string, unknown>) {
+    setBusy(true);
+    setAuthStatusMessage("");
+    const res = await fetch("/api/admin/site-auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setAuthStatusMessage(data.error ?? "Action failed.");
+    } else {
+      if (data.users) setSiteUsers(data.users);
+      if (typeof data.protectionEnabled === "boolean") setProtectionEnabled(data.protectionEnabled);
+      setAuthStatusMessage(data.message ?? "Saved.");
+    }
+    setBusy(false);
+  }
+
   async function handleAddFeed(e: React.FormEvent) {
     e.preventDefault();
     if (!newName || !newUrl) return;
@@ -66,6 +105,18 @@ export default function OwnerFeedsPage() {
     await doAction("add_from_store", { name: storeName, storeUrl });
     setStoreName("");
     setStoreUrl("");
+  }
+
+  async function handleAddUser(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newUsername || !newPassword) return;
+    await doAuthAction("add_user", { username: newUsername, password: newPassword });
+    setNewUsername("");
+    setNewPassword("");
+  }
+
+  async function handleToggleProtection() {
+    await doAuthAction("set_protection", { enabled: !protectionEnabled });
   }
 
   function handleExportCsv() {
@@ -118,6 +169,86 @@ export default function OwnerFeedsPage() {
             ← Back
           </a>
         </div>
+      </div>
+
+      {/* Site Access Control Section */}
+      <div className="mb-8 p-4 rounded-xl border-2 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium">Site Access Control</h2>
+          <button
+            onClick={handleToggleProtection}
+            disabled={busy}
+            className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${protectionEnabled ? "bg-amber-500" : "bg-gray-300 dark:bg-gray-600"}`}
+          >
+            <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${protectionEnabled ? "translate-x-6" : "translate-x-0.5"}`} />
+          </button>
+        </div>
+
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          {protectionEnabled
+            ? "Site is password-protected. Visitors must log in."
+            : "Site is public. Anyone can access it."}
+        </p>
+
+        {protectionEnabled && siteUsers.length === 0 && (
+          <p className="text-sm text-red-600 dark:text-red-400 mb-3 font-medium">
+            Warning: Protection is enabled but no users exist. Nobody will be able to access the site.
+          </p>
+        )}
+
+        {authStatusMessage && (
+          <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">{authStatusMessage}</p>
+        )}
+
+        <form onSubmit={handleAddUser} className="flex flex-col sm:flex-row gap-3 mb-4">
+          <input
+            type="text"
+            placeholder="Username"
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            autoComplete="off"
+            className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            autoComplete="new-password"
+            className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+            required
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="px-4 py-2 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm disabled:opacity-50"
+          >
+            Add User
+          </button>
+        </form>
+
+        {siteUsers.length > 0 && (
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800/50">
+            {siteUsers.map((user) => (
+              <div key={user.username} className="flex items-center justify-between px-4 py-2.5">
+                <div>
+                  <span className="text-sm font-medium">{user.username}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+                    added {new Date(user.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <button
+                  onClick={() => doAuthAction("remove_user", { username: user.username })}
+                  disabled={busy}
+                  className="text-xs text-red-400 hover:text-red-600 transition"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {statusMessage && (
