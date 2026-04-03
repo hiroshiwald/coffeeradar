@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isSiteProtectionEnabled } from "@/lib/siteAuthStore";
+import { validateSessionCookie, getSessionCookieName } from "@/lib/session";
 
 function unauthorizedResponse(): NextResponse {
   return new NextResponse("Unauthorized", {
@@ -7,7 +9,7 @@ function unauthorizedResponse(): NextResponse {
   });
 }
 
-export function middleware(req: NextRequest): NextResponse {
+function handleBasicAuth(req: NextRequest): NextResponse {
   const expectedUser = process.env.OWNER_USERNAME;
   const expectedPass = process.env.OWNER_PASSWORD;
 
@@ -33,6 +35,55 @@ export function middleware(req: NextRequest): NextResponse {
   return NextResponse.next();
 }
 
+export async function middleware(req: NextRequest): Promise<NextResponse> {
+  const { pathname } = req.nextUrl;
+
+  // Owner/admin routes: existing Basic Auth (unchanged)
+  if (pathname.startsWith("/owner") || pathname.startsWith("/api/admin")) {
+    return handleBasicAuth(req);
+  }
+
+  // Login page: always accessible
+  if (pathname === "/login") {
+    return NextResponse.next();
+  }
+
+  // Auth API routes: always accessible (login/logout endpoints)
+  if (pathname.startsWith("/api/auth")) {
+    return NextResponse.next();
+  }
+
+  // Public routes: check if site protection is enabled
+  const protectionEnabled = await isSiteProtectionEnabled();
+  if (!protectionEnabled) {
+    return NextResponse.next();
+  }
+
+  // Protection is on: validate session cookie
+  const sessionCookie = req.cookies.get(getSessionCookieName())?.value;
+  if (sessionCookie) {
+    const { valid } = await validateSessionCookie(sessionCookie);
+    if (valid) return NextResponse.next();
+  }
+
+  // No valid session: redirect pages, 401 for API
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  const loginUrl = new URL("/login", req.url);
+  loginUrl.searchParams.set("redirect", pathname);
+  return NextResponse.redirect(loginUrl);
+}
+
 export const config = {
-  matcher: ["/owner/:path*", "/api/admin/:path*"],
+  matcher: [
+    "/owner/:path*",
+    "/api/admin/:path*",
+    "/",
+    "/api/coffees",
+    "/api/sources",
+    "/api/auth/:path*",
+    "/login",
+  ],
 };
