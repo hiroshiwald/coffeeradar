@@ -53,6 +53,11 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
+  // Cron endpoint: uses its own Bearer token auth
+  if (pathname.startsWith("/api/cron")) {
+    return NextResponse.next();
+  }
+
   // Public routes: check if site protection is enabled
   const protectionEnabled = await isSiteProtectionEnabled();
   if (!protectionEnabled) {
@@ -78,12 +83,6 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 
 export const config = {
   matcher: [
-    "/owner/:path*",
-    "/api/admin/:path*",
-    "/",
-    "/api/coffees",
-    "/api/sources",
-    "/api/auth/:path*",
-    "/login",
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

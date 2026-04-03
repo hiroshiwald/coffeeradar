@@ -1,4 +1,4 @@
-import { createClient, type Client } from "@libsql/client";
+import { createClient, type Client } from "@libsql/client/web";
 import { CoffeeEntry, FeedSource, SiteUser } from "./types";
 import seedSources from "../../data/sources.json";
 
