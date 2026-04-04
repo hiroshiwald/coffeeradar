@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isSiteProtectionEnabled } from "@/lib/siteAuthStore";
 import { validateSessionCookie, getSessionCookieName } from "@/lib/session";
 
 function unauthorizedResponse(): NextResponse {
@@ -35,6 +34,18 @@ function handleBasicAuth(req: NextRequest): NextResponse {
   return NextResponse.next();
 }
 
+async function checkProtectionEnabled(req: NextRequest): Promise<boolean> {
+  try {
+    const url = new URL("/api/auth/check-protection", req.url);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return true; // fail closed
+    const data = await res.json();
+    return data.enabled === true;
+  } catch {
+    return true; // fail closed: assume protection is on
+  }
+}
+
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
 
@@ -58,8 +69,9 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  // Public routes: check if site protection is enabled
-  const protectionEnabled = await isSiteProtectionEnabled();
+  // Public routes: check if site protection is enabled via internal API
+  // (avoids Edge/Node runtime mismatch — in-memory state is not shared)
+  const protectionEnabled = await checkProtectionEnabled(req);
   if (!protectionEnabled) {
     return NextResponse.next();
   }
