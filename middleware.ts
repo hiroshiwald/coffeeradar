@@ -58,8 +58,9 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  // Public routes: query Turso directly from Edge Runtime (no self-fetch)
-  const protectionEnabled = await isProtectionEnabled();
+  // Public routes: query Turso directly from Edge Runtime.
+  // Will self-fetch fallback if running locally without Turso.
+  const protectionEnabled = await isProtectionEnabled(req.url);
   if (!protectionEnabled) {
     return NextResponse.next();
   }
