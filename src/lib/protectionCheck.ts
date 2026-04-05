@@ -13,7 +13,6 @@ function getClient(): Client | null {
 
 export async function isProtectionEnabled(reqUrl?: string): Promise<boolean> {
   const db = getClient();
-  
   if (db) {
     try {
       const result = await db.execute({
@@ -22,29 +21,20 @@ export async function isProtectionEnabled(reqUrl?: string): Promise<boolean> {
       });
       return result.rows.length > 0 && String(result.rows[0].value) === "true";
     } catch {
-      // Table may not exist yet, or Turso unreachable. Fail closed.
       return true;
     }
   }
 
-  // Fallback for in-memory mode (No Turso)
-  // Edge runtime cannot read Node memory, so we query the API directly.
   if (!reqUrl) return false;
-
   try {
     const url = new URL("/api/auth/check-protection", reqUrl);
-    
-    // Fix for Node 18+ IPv6 localhost fetch issue
-    if (url.hostname === "localhost") {
-      url.hostname = "127.0.0.1";
-    }
+    if (url.hostname === "localhost") url.hostname = "127.0.0.1";
     
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) return false;
     const data = await res.json();
     return data.enabled === true;
   } catch (error) {
-    console.error("Failed to fetch protection state:", error);
     return false;
   }
 }
