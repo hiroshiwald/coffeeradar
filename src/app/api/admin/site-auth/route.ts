@@ -5,6 +5,7 @@ import {
   removeSiteUser,
   isSiteProtectionEnabled,
   setSiteProtection,
+  hasPersistentSiteAuthStore,
 } from "@/lib/siteAuthStore";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +15,29 @@ export async function GET() {
     listSiteUsers(),
     isSiteProtectionEnabled(),
   ]);
-  return NextResponse.json({ users, protectionEnabled });
+  const persistentStoreAvailable = hasPersistentSiteAuthStore();
+  return NextResponse.json({
+    users,
+    protectionEnabled,
+    persistentStoreAvailable,
+    storageMode: persistentStoreAvailable ? "turso" : "in-memory",
+    warning: persistentStoreAvailable
+      ? undefined
+      : "Site auth is using in-memory storage. Protection settings and users are not reliable across server instances.",
+  });
 }
 
 export async function POST(request: NextRequest) {
+  if (!hasPersistentSiteAuthStore()) {
+    return NextResponse.json(
+      {
+        error:
+          "Site protection requires Turso persistence. Configure TURSO_DATABASE_URL and TURSO_AUTH_TOKEN before changing site access settings.",
+      },
+      { status: 503 }
+    );
+  }
+
   const body = await request.json();
   const { action } = body;
 

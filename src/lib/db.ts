@@ -315,18 +315,11 @@ export async function dbRemoveSiteUser(username: string): Promise<void> {
 
 // --- Site Settings ---
 
-let siteProtectionCache: { value: boolean; ts: number } | null = null;
-
 export async function dbGetSiteProtection(): Promise<boolean> {
-  if (siteProtectionCache && Date.now() - siteProtectionCache.ts < 60_000) {
-    return siteProtectionCache.value;
-  }
   const db = getClient();
   if (!db) return false;
   const result = await db.execute({ sql: `SELECT value FROM site_settings WHERE key = ?`, args: ["site_protection_enabled"] });
-  const enabled = result.rows.length > 0 && String(result.rows[0].value) === "true";
-  siteProtectionCache = { value: enabled, ts: Date.now() };
-  return enabled;
+  return result.rows.length > 0 && String(result.rows[0].value) === "true";
 }
 
 export async function dbSetSiteProtection(enabled: boolean): Promise<void> {
@@ -336,9 +329,4 @@ export async function dbSetSiteProtection(enabled: boolean): Promise<void> {
     sql: `INSERT OR REPLACE INTO site_settings (key, value) VALUES (?, ?)`,
     args: ["site_protection_enabled", enabled ? "true" : "false"],
   });
-  siteProtectionCache = { value: enabled, ts: Date.now() };
-}
-
-export function invalidateSiteProtectionCache(): void {
-  siteProtectionCache = null;
 }

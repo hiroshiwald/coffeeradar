@@ -37,7 +37,11 @@ function handleBasicAuth(req: NextRequest): NextResponse {
 async function checkProtectionEnabled(req: NextRequest): Promise<boolean> {
   try {
     const url = new URL("/api/auth/check-protection", req.url);
-    const res = await fetch(url.toString(), { cache: "no-store" });
+    url.searchParams.set("_ts", Date.now().toString());
+    const res = await fetch(url.toString(), {
+      cache: "no-store",
+      headers: { "cache-control": "no-cache" },
+    });
     if (!res.ok) return true; // fail closed
     const data = await res.json();
     return data.enabled === true;

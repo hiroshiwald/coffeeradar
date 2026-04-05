@@ -25,6 +25,10 @@ import {
 } from "./siteAuth";
 import { hashPassword, verifyPassword } from "./crypto";
 
+export function hasPersistentSiteAuthStore(): boolean {
+  return hasTurso();
+}
+
 export async function listSiteUsers(): Promise<Omit<SiteUser, "passwordHash" | "salt">[]> {
   let users: SiteUser[];
   if (hasTurso()) {
