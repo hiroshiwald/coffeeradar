@@ -1,9 +1,7 @@
 import { CoffeeEntry } from "./types";
 import { parseFeed } from "./feedParser";
 import { listEnabledMasterSources } from "./sourceStore";
-
-const CONCURRENCY = 25;
-const TIMEOUT = 5000;
+import { FEED_CONCURRENCY, FEED_TIMEOUT_MS, THIRTY_DAYS_MS } from "./constants";
 
 export interface FeedResult {
   url: string;
@@ -19,7 +17,7 @@ interface FetchTarget {
 async function fetchOne(source: FetchTarget): Promise<{ entries: CoffeeEntry[]; ok: boolean }> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT);
+    const timer = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS);
     const res = await fetch(source.url, {
       signal: controller.signal,
       headers: { "User-Agent": "CoffeeRadar/1.0", Accept: "application/atom+xml, application/rss+xml, application/xml, text/xml" },
@@ -47,8 +45,8 @@ export async function fetchAllFeeds(): Promise<{
   let healthy = 0;
   let failed = 0;
 
-  for (let i = 0; i < enabled.length; i += CONCURRENCY) {
-    const batch = enabled.slice(i, i + CONCURRENCY);
+  for (let i = 0; i < enabled.length; i += FEED_CONCURRENCY) {
+    const batch = enabled.slice(i, i + FEED_CONCURRENCY);
     const results = await Promise.all(batch.map(fetchOne));
     for (let j = 0; j < batch.length; j++) {
       const r = results[j];
@@ -64,7 +62,7 @@ export async function fetchAllFeeds(): Promise<{
     }
   }
 
-  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS;
   const recent = allEntries.filter((e) => {
     const d = new Date(e.date).getTime();
     return !d || d > thirtyDaysAgo;
