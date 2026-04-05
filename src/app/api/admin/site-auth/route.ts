@@ -28,15 +28,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  if (!hasPersistentSiteAuthStore()) {
-    return NextResponse.json(
-      {
-        error:
-          "Site protection requires Turso persistence. Configure TURSO_DATABASE_URL and TURSO_AUTH_TOKEN before changing site access settings.",
-      },
-      { status: 503 }
-    );
-  }
+  // REMOVED the strict block that required hasPersistentSiteAuthStore()
+  // to allow local in-memory toggling of protection and users.
 
   const body = await request.json();
   const { action } = body;
