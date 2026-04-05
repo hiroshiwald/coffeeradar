@@ -12,16 +12,12 @@ import {
   dbGetSiteUserByUsername,
   dbAddSiteUser,
   dbRemoveSiteUser,
-  dbGetSiteProtection,
-  dbSetSiteProtection,
 } from "./db";
 import {
   memGetSiteUsers,
   memGetSiteUserByUsername,
   memAddSiteUser,
   memRemoveSiteUser,
-  memGetSiteProtection,
-  memSetSiteProtection,
 } from "./siteAuth";
 import { hashPassword, verifyPassword } from "./crypto";
 
@@ -79,19 +75,3 @@ export async function validateSiteUser(username: string, password: string): Prom
   return verifyPassword(password, user.salt, user.passwordHash);
 }
 
-export async function isSiteProtectionEnabled(): Promise<boolean> {
-  if (hasTurso()) {
-    await initDb();
-    return dbGetSiteProtection();
-  }
-  return memGetSiteProtection();
-}
-
-export async function setSiteProtection(enabled: boolean): Promise<void> {
-  if (hasTurso()) {
-    await initDb();
-    await dbSetSiteProtection(enabled);
-  } else {
-    memSetSiteProtection(enabled);
-  }
-}

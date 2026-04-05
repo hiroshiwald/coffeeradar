@@ -313,20 +313,3 @@ export async function dbRemoveSiteUser(username: string): Promise<void> {
   await db.execute({ sql: `DELETE FROM site_users WHERE username = ?`, args: [username] });
 }
 
-// --- Site Settings ---
-
-export async function dbGetSiteProtection(): Promise<boolean> {
-  const db = getClient();
-  if (!db) return false;
-  const result = await db.execute({ sql: `SELECT value FROM site_settings WHERE key = ?`, args: ["site_protection_enabled"] });
-  return result.rows.length > 0 && String(result.rows[0].value) === "true";
-}
-
-export async function dbSetSiteProtection(enabled: boolean): Promise<void> {
-  const db = getClient();
-  if (!db) return;
-  await db.execute({
-    sql: `INSERT OR REPLACE INTO site_settings (key, value) VALUES (?, ?)`,
-    args: ["site_protection_enabled", enabled ? "true" : "false"],
-  });
-}
