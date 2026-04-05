@@ -33,6 +33,12 @@ export async function isProtectionEnabled(reqUrl?: string): Promise<boolean> {
 
   try {
     const url = new URL("/api/auth/check-protection", reqUrl);
+    
+    // Fix for Node 18+ IPv6 localhost fetch issue
+    if (url.hostname === "localhost") {
+      url.hostname = "127.0.0.1";
+    }
+    
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) return false;
     const data = await res.json();
