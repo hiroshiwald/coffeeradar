@@ -27,8 +27,6 @@ export default function OwnerFeedsPage() {
   // Site access control state
   const [siteUsers, setSiteUsers] = useState<SiteUserInfo[]>([]);
   const [protectionEnabled, setProtectionEnabled] = useState(false);
-  const [persistentStoreAvailable, setPersistentStoreAvailable] = useState(true);
-  const [siteAuthWarning, setSiteAuthWarning] = useState("");
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [authStatusMessage, setAuthStatusMessage] = useState("");
@@ -47,8 +45,6 @@ export default function OwnerFeedsPage() {
     const data = await res.json();
     setSiteUsers(data.users ?? []);
     setProtectionEnabled(data.protectionEnabled ?? false);
-    setPersistentStoreAvailable(data.persistentStoreAvailable ?? false);
-    setSiteAuthWarning(data.warning ?? "");
   }, []);
 
   useEffect(() => { fetchSources(); fetchSiteAuth(); }, [fetchSources, fetchSiteAuth]);
@@ -119,14 +115,6 @@ export default function OwnerFeedsPage() {
     setNewPassword("");
   }
 
-  async function handleToggleProtection() {
-    if (!persistentStoreAvailable) {
-      setAuthStatusMessage("Enable Turso first: site protection cannot be safely enabled with in-memory storage.");
-      return;
-    }
-    await doAuthAction("set_protection", { enabled: !protectionEnabled });
-  }
-
   function handleExportCsv() {
     window.location.href = "/api/admin/sources/csv";
   }
@@ -183,26 +171,21 @@ export default function OwnerFeedsPage() {
       <div className="mb-8 p-4 rounded-xl border-2 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium">Site Access Control</h2>
-          <button
-            onClick={handleToggleProtection}
-            disabled={busy || !persistentStoreAvailable}
-            className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${protectionEnabled ? "bg-amber-500" : "bg-gray-300 dark:bg-gray-600"}`}
-          >
-            <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${protectionEnabled ? "translate-x-6" : "translate-x-0.5"}`} />
-          </button>
+          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+            protectionEnabled
+              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+              : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+          }`}>
+            {protectionEnabled ? "ON" : "OFF"}
+          </div>
         </div>
 
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
           {protectionEnabled
             ? "Site is password-protected. Visitors must log in."
             : "Site is public. Anyone can access it."}
+          {" "}Controlled by <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">SITE_PROTECTION_ENABLED</code> env var.
         </p>
-
-        {!persistentStoreAvailable && (
-          <p className="text-sm text-red-600 dark:text-red-400 mb-3 font-medium">
-            {siteAuthWarning || "Site auth is using in-memory storage. Configure Turso to reliably enforce protection."}
-          </p>
-        )}
 
         {protectionEnabled && siteUsers.length === 0 && (
           <p className="text-sm text-red-600 dark:text-red-400 mb-3 font-medium">
@@ -223,7 +206,7 @@ export default function OwnerFeedsPage() {
             autoComplete="off"
             className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
             required
-            disabled={!persistentStoreAvailable || busy}
+            disabled={busy}
           />
           <input
             type="password"
@@ -233,11 +216,11 @@ export default function OwnerFeedsPage() {
             autoComplete="new-password"
             className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
             required
-            disabled={!persistentStoreAvailable || busy}
+            disabled={busy}
           />
           <button
             type="submit"
-            disabled={busy || !persistentStoreAvailable}
+            disabled={busy}
             className="px-4 py-2 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm disabled:opacity-50"
           >
             Add User
@@ -256,7 +239,7 @@ export default function OwnerFeedsPage() {
                 </div>
                 <button
                   onClick={() => doAuthAction("remove_user", { username: user.username })}
-                  disabled={busy || !persistentStoreAvailable}
+                  disabled={busy}
                   className="text-xs text-red-400 hover:text-red-600 transition"
                 >
                   Remove

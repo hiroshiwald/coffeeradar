@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateSessionCookie, getSessionCookieName } from "@/lib/session";
-import { isProtectionEnabled } from "@/lib/protectionCheck";
 
 function unauthorizedResponse(): NextResponse {
   return new NextResponse("Unauthorized", {
@@ -58,9 +57,8 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  // Public routes: query Turso directly from Edge Runtime.
-  // Will self-fetch fallback if running locally without Turso.
-  const protectionEnabled = await isProtectionEnabled(req.url);
+  // Public routes: env var check (zero-latency, works in all runtimes)
+  const protectionEnabled = process.env.SITE_PROTECTION_ENABLED === "true";
   if (!protectionEnabled) {
     return NextResponse.next();
   }

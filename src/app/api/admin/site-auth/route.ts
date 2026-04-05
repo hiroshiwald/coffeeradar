@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listSiteUsers, addSiteUser, removeSiteUser, isSiteProtectionEnabled, setSiteProtection } from "@/lib/siteAuthStore";
+import { listSiteUsers, addSiteUser, removeSiteUser } from "@/lib/siteAuthStore";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const [users, protectionEnabled] = await Promise.all([listSiteUsers(), isSiteProtectionEnabled()]);
-  return NextResponse.json({
-    users,
-    protectionEnabled,
-    persistentStoreAvailable: true, // Forced true so the UI allows toggling locally
-    storageMode: "local-file-fallback",
-  });
+  const users = await listSiteUsers();
+  const protectionEnabled = process.env.SITE_PROTECTION_ENABLED === "true";
+  return NextResponse.json({ users, protectionEnabled });
 }
 
 export async function POST(request: NextRequest) {
@@ -33,9 +29,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ users, message: `User "${username}" removed.` });
     }
     case "set_protection": {
-      const { enabled } = body;
-      await setSiteProtection(enabled);
-      return NextResponse.json({ protectionEnabled: enabled });
+      return NextResponse.json(
+        { error: "Protection is controlled via the SITE_PROTECTION_ENABLED environment variable. Update it in your hosting dashboard and redeploy." },
+        { status: 400 }
+      );
     }
     default:
       return NextResponse.json({ error: "Unknown action." }, { status: 400 });

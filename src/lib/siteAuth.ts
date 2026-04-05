@@ -31,9 +31,3 @@ export function memRemoveSiteUser(username: string): void {
   data.users = data.users.filter((u: any) => u.username !== username);
   saveAuthData(data);
 }
-export function memGetSiteProtection(): boolean { return getAuthData().protectionEnabled; }
-export function memSetSiteProtection(enabled: boolean): void {
-  const data = getAuthData();
-  data.protectionEnabled = enabled;
-  saveAuthData(data);
-}
