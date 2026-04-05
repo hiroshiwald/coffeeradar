@@ -1,98 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ApiResponse, CoffeeEntry } from "@/lib/types";
+import { useMemo, useState } from "react";
+import { CoffeeEntry } from "@/lib/types";
+import { getNoteColor } from "@/lib/noteColors";
+import { timeAgo, formatDate } from "@/lib/formatters";
+import { filterCoffees, sortCoffees, countNotes, SortKey, SortDir } from "@/lib/coffeeFilters";
+import { useCoffeeData } from "@/hooks/useCoffeeData";
 import ThemeToggle from "./ThemeToggle";
 
-type SortKey = "date" | "roaster" | "coffee" | "type" | "process" | "price";
-type SortDir = "asc" | "desc";
-
-const NOTE_COLORS: Record<string, string> = {};
-const FAMILIES: [string, string[]][] = [
-  ["bg-rose-100 dark:bg-rose-900/25 text-rose-700 dark:text-rose-300", [
-    "berry", "blueberry", "strawberry", "raspberry", "blackberry", "cherry",
-    "cranberry", "boysenberry", "mulberry", "black cherry", "red currant",
-    "blackcurrant", "currant", "jam", "preserves", "red fruit",
-  ]],
-  ["bg-amber-100 dark:bg-amber-900/25 text-amber-700 dark:text-amber-300", [
-    "citrus", "lemon", "lime", "orange", "grapefruit", "tangerine",
-    "mandarin", "clementine", "yuzu", "blood orange", "lemonade",
-    "marmalade", "zest",
-  ]],
-  ["bg-orange-100 dark:bg-orange-900/25 text-orange-700 dark:text-orange-300", [
-    "mango", "papaya", "pineapple", "tropical", "passion fruit", "guava",
-    "lychee", "melon", "watermelon", "banana", "coconut", "jackfruit",
-    "starfruit", "dragon fruit",
-  ]],
-  ["bg-pink-100 dark:bg-pink-900/25 text-pink-700 dark:text-pink-300", [
-    "peach", "apricot", "plum", "nectarine", "stone fruit",
-    "apple", "pear", "grape", "green apple", "red apple",
-    "fig", "date", "raisin", "prune", "dried fruit",
-  ]],
-  ["bg-yellow-100 dark:bg-yellow-900/25 text-yellow-800 dark:text-yellow-300", [
-    "chocolate", "cocoa", "cacao", "milk chocolate", "dark chocolate",
-    "white chocolate", "fudge", "brownie", "baker's chocolate",
-  ]],
-  ["bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200", [
-    "caramel", "toffee", "butterscotch", "brown sugar", "molasses",
-    "maple", "maple syrup", "honey", "vanilla", "nougat", "praline",
-    "marshmallow", "cotton candy", "dulce de leche", "sugarcane",
-  ]],
-  ["bg-violet-100 dark:bg-violet-900/25 text-violet-700 dark:text-violet-300", [
-    "floral", "jasmine", "rose", "lavender", "hibiscus", "bergamot",
-    "chamomile", "elderflower", "orange blossom", "honeysuckle",
-    "violet", "lilac", "geranium",
-  ]],
-  ["bg-stone-200 dark:bg-stone-800/40 text-stone-700 dark:text-stone-300", [
-    "nutty", "almond", "hazelnut", "walnut", "peanut", "pecan",
-    "cashew", "macadamia", "pistachio", "roasted nuts",
-  ]],
-  ["bg-red-100 dark:bg-red-900/25 text-red-700 dark:text-red-300", [
-    "spice", "cinnamon", "clove", "cardamom", "ginger", "black pepper",
-    "white pepper", "allspice", "nutmeg", "star anise", "anise",
-  ]],
-  ["bg-emerald-100 dark:bg-emerald-900/25 text-emerald-700 dark:text-emerald-300", [
-    "black tea", "green tea", "earl grey", "oolong", "herbal",
-    "mint", "eucalyptus", "sage", "thyme", "rosemary", "tea-like",
-  ]],
-  ["bg-purple-100 dark:bg-purple-900/25 text-purple-700 dark:text-purple-300", [
-    "wine", "winey", "whiskey", "rum", "brandy", "port",
-    "red wine", "white wine", "champagne", "sparkling",
-  ]],
-  ["bg-slate-200 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300", [
-    "cedar", "tobacco", "leather", "earthy", "woody", "oak",
-    "sandalwood", "pine", "smoky",
-  ]],
-];
-for (const [cls, words] of FAMILIES) {
-  for (const w of words) NOTE_COLORS[w.toLowerCase()] = cls;
-}
-const DEFAULT_NOTE_COLOR = "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300";
-
-function getNoteColor(note: string): string {
-  return NOTE_COLORS[note.toLowerCase()] ?? DEFAULT_NOTE_COLOR;
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  return `${hrs}h ${mins % 60}m ago`;
-}
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  } catch {
-    return "";
-  }
-}
-
 export default function CoffeeTable() {
-  const [data, setData] = useState<ApiResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, refresh } = useCoffeeData();
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -101,77 +18,16 @@ export default function CoffeeTable() {
   const [filterNote, setFilterNote] = useState("");
   const [showMerch, setShowMerch] = useState(false);
 
-  const fetchData = useCallback(async (refresh = false) => {
-    setLoading(true);
-    try {
-      const url = refresh ? "/api/coffees?refresh=true" : "/api/coffees";
-      const res = await fetch(url);
-      const json: ApiResponse = await res.json();
-      setData(json);
-    } catch {
-      // keep existing data
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
   const allNotes = useMemo(() => {
     if (!data) return [];
-    const counts = new Map<string, number>();
-    for (const c of data.coffees) {
-      if (c.isMerch) continue;
-      for (const n of c.tastingNotes) {
-        counts.set(n, (counts.get(n) ?? 0) + 1);
-      }
-    }
+    const counts = countNotes(data.coffees);
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([n]) => n);
   }, [data]);
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    let list = data.coffees;
-
-    // Merch filter
-    if (!showMerch) list = list.filter((c) => !c.isMerch);
-
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (c) =>
-          c.roaster.toLowerCase().includes(q) ||
-          c.coffee.toLowerCase().includes(q) ||
-          c.type.toLowerCase().includes(q) ||
-          c.process.toLowerCase().includes(q) ||
-          c.tastingNotes.some((n) => n.toLowerCase().includes(q))
-      );
-    }
-    if (filterType) list = list.filter((c) => c.type === filterType);
-    if (filterProcess) list = list.filter((c) => c.process === filterProcess);
-    if (filterNote) list = list.filter((c) => c.tastingNotes.includes(filterNote));
-
-    const sorted = [...list].sort((a, b) => {
-      let va: string | number = "";
-      let vb: string | number = "";
-      switch (sortKey) {
-        case "date":
-          va = new Date(a.date).getTime() || 0;
-          vb = new Date(b.date).getTime() || 0;
-          break;
-        case "price":
-          va = parseFloat(a.price.replace(/[^0-9.]/g, "")) || 0;
-          vb = parseFloat(b.price.replace(/[^0-9.]/g, "")) || 0;
-          break;
-        default:
-          va = a[sortKey].toLowerCase();
-          vb = b[sortKey].toLowerCase();
-      }
-      if (va < vb) return sortDir === "asc" ? -1 : 1;
-      if (va > vb) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-    return sorted;
+    const list = filterCoffees(data.coffees, { search, filterType, filterProcess, filterNote, showMerch });
+    return sortCoffees(list, sortKey, sortDir);
   }, [data, search, filterType, filterProcess, filterNote, sortKey, sortDir, showMerch]);
 
   function toggleSort(key: SortKey) {
@@ -200,7 +56,7 @@ export default function CoffeeTable() {
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">New releases from specialty roasters</p>
         </div>
         <div className="flex items-center gap-2">
-          
+
           <ThemeToggle />
         </div>
       </div>
@@ -261,7 +117,7 @@ export default function CoffeeTable() {
         </button>
 
         <button
-          onClick={() => fetchData(true)}
+          onClick={() => refresh()}
           disabled={loading}
           className="px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50 whitespace-nowrap"
         >
