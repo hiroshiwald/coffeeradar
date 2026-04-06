@@ -18,20 +18,6 @@
 - Confirmed DB retention logic exists for `coffees` table via `cleanOldEntries()` and `getCoffees()` date filter in `src/lib/db.ts`, but sources are not persisted in DB.
 - Confirmed cron and refresh paths call pruning (`src/app/api/cron/route.ts`, `src/app/api/coffees/route.ts`).
 
-### Commands executed
-- `pwd && rg --files -g 'AGENTS.md'`
-- `find .. -maxdepth 3 -name AGENTS.md`
-- `rg --files | head -n 200`
-- `sed -n '1,220p' src/app/admin/page.tsx`
-- `sed -n '1,260p' src/app/page.tsx`
-- `sed -n '1,260p' src/app/api/sources/route.ts`
-- `sed -n '1,260p' src/lib/sources.ts`
-- `sed -n '1,320p' src/lib/db.ts`
-- `sed -n '1,260p' src/app/api/coffees/route.ts`
-- `sed -n '1,260p' src/app/api/cron/route.ts`
-- `rg -n "admin|auth|middleware|sources.json|csv|owner|CRON_SECRET|TURSO|feed" src package.json README.md docs -g '!node_modules'`
-- `sed -n '170,250p' src/components/CoffeeTable.tsx`
-
 ### Planned implementation approach (pending user approval)
 1. Add owner-only protection middleware for an admin namespace route.
 2. Move admin UI under a non-public path and remove direct public-page link.
@@ -42,79 +28,7 @@
 7. Validate flows manually and with lightweight checks.
 
 ### Status
-- No functional implementation yet.
 - Waiting for explicit user approval before coding the feature work.
-
-## 2026-04-06 — Password protection: root cause finally identified
-
-### Problem history
-PRs #9 through #20 (12 attempts!) tried to fix "password not working." Each addressed
-a real secondary issue but none fixed the actual bug. Issues fixed along the way:
-- Edge Runtime incompatibility (#10, #11)
-- Stale caches and cache-busting (#12, #13)
-- Direct Turso query instead of self-fetch (#14)
-- Protection check fallback for Edge middleware (#15, #16)
-- In-memory store actions (#17)
-- Local persistence and fallback (#18)
-- Env var check replacing dynamic DB check (#20)
-
-### Actual root cause (identified in this session)
-**The login form could never succeed because no valid credentials existed.**
-
-The auth system has TWO separate credential stores:
-1. `OWNER_USERNAME` / `OWNER_PASSWORD` env vars → used ONLY for HTTP Basic Auth
-   on `/owner/*` and `/api/admin/*` routes (middleware.ts)
-2. `site_users` store (DB table or `data/local-auth.json`) → used by the login
-   form at `/login` via `POST /api/auth/login` → `validateSiteUser()`
-
-When `SITE_PROTECTION_ENABLED=true`, middleware redirects to `/login`. The user
-enters their OWNER_PASSWORD. But `validateSiteUser()` only checks the `site_users`
-store, which is EMPTY (no `local-auth.json` file, no DB rows). Login always fails
-with "Invalid credentials" regardless of what is entered.
-
-Creating site users requires the admin panel (`/owner/feeds`) which uses Basic Auth
-(OWNER_PASSWORD) — a completely different auth mechanism. Chicken-and-egg problem.
-
-### Fix applied (commit 045897e)
-`src/lib/siteAuthStore.ts` → `validateSiteUser()` now falls back to checking
-`OWNER_USERNAME`/`OWNER_PASSWORD` env vars when no matching site user is found.
-The admin can always log in with owner credentials.
-
-### Also applied (commit e5d7149)
-Defense-in-depth hardening (was the originally requested fix, but not the root cause):
-- `middleware.ts`: try/catch wrapper (fail-closed on exceptions)
-- `src/lib/authGuard.ts`: shared auth utility for server components and API routes
-- `src/app/page.tsx`: server-side auth check + `force-dynamic`
-- `src/app/api/coffees/route.ts`: route-level auth guard
-- `src/app/api/sources/route.ts`: route-level auth guard
-- `src/lib/session.ts`: `getSecret()` throws in production without secrets
-- `src/hooks/useCoffeeData.ts`: 401 → redirect to /login
-- `src/lib/__tests__/authGuard.test.ts`: fail-closed tests
-- `.env.example`: documents required env vars
-
-### DEEPER root cause (also identified this session, after screenshot of Vercel env vars)
-The middleware ALSO never ran its protection logic because `SITE_PROTECTION_ENABLED`
-was never set in Vercel environment variables. Only TURSO_DATABASE_URL, TURSO_AUTH_TOKEN,
-and DATABASE_URL vars were configured. The middleware gate at line 62:
-  `process.env.SITE_PROTECTION_ENABLED === "true"` → `undefined === "true"` → false
-...caused every request to pass through. All 12 PRs changed code behind this gate.
-
-### Final fix
-Changed protection logic to auto-enable when `OWNER_PASSWORD` is set:
-- `middleware.ts`: `!!process.env.OWNER_PASSWORD && process.env.SITE_PROTECTION_ENABLED !== "false"`
-- `src/lib/authGuard.ts`: same logic in `isProtectionEnabled()`
-- No separate toggle needed. Set OWNER_PASSWORD → site is protected.
-- To explicitly disable: set `SITE_PROTECTION_ENABLED=false`
-
-### User must add to Vercel Environment Variables
-- `OWNER_USERNAME` — login username
-- `OWNER_PASSWORD` — login password (also enables site protection)
-- `SESSION_SECRET` — random 32+ char string for session signing
-
-### Key lesson for future sessions
-**ALWAYS trace the actual user action end-to-end before fixing infrastructure.**
-Check env vars first. Check the deployment config. Read the DEVLOG before starting.
-The middleware code was fine — the env var it depended on was never set.
 
 ## 2026-04-01 — Implementation after approval
 
@@ -135,11 +49,108 @@ The middleware code was fine — the env var it depended on was never set.
 - Made legacy `/api/sources` read-only (no public mutating actions).
 - Extended retention cleanup to delete old `feed_results` rows (>30 days) along with old coffee rows.
 
-### Commands executed
-- `mkdir -p src/app/api/admin/sources src/app/api/admin/sources/csv`
-- `mkdir -p src/app/owner/feeds`
-- `npm run build`
-
 ### Build result
 - `npm run build` passed.
 - Existing warning remains in repository config: unrecognized `serverExternalPackages` key in `next.config.mjs` (pre-existing).
+
+## 2026-04-01 through 2026-04-05 — Password protection attempts (PRs #9–#20)
+
+### Summary
+12 PRs attempted to fix "password not working" after site protection was added in PR #9.
+Each addressed a real secondary issue but none fixed the actual root cause.
+
+### Issues fixed along the way
+- PR #9: Initial site password protection with admin-managed users
+- PR #10: Edge Runtime incompatibility with password hashing
+- PR #11: Edge/Node runtime mismatch causing bypass
+- PR #12: Required persistent auth storage
+- PR #13: Removed stale caches, added cache-busting to middleware check
+- PR #14: Replaced self-fetch with direct Turso query
+- PR #15: Protection check fallback for Edge middleware
+- PR #16: Site protection fallback state sync across runtimes
+- PR #17: Allowed site auth admin actions with in-memory store
+- PR #18: Fixed local site protection persistence and fallback checks
+- PR #19: Refactored CoffeeTable into testable modules, added Vitest test suite (109 tests)
+- PR #20: Replaced dynamic DB check with env var for protection status
+
+### Why none of these fixed the problem
+Two root causes were missed by every attempt:
+
+1. **Login could never succeed.** The login form validated against a `site_users` store
+   (DB or `data/local-auth.json`) which was always empty. `OWNER_USERNAME`/`OWNER_PASSWORD`
+   were only used for Basic Auth on admin routes — the login form never checked them.
+   Chicken-and-egg: you need to be logged in to create users, but you can't log in without users.
+
+2. **Middleware protection never activated.** The middleware checked
+   `process.env.SITE_PROTECTION_ENABLED === "true"` but this env var was never added to
+   Vercel. Only `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `DATABASE_URL` were configured.
+   The gate evaluated to `false` and every request passed through. All 12 PRs changed code
+   behind this gate that never executed.
+
+## 2026-04-06 — Password protection: root cause identified and fixed
+
+### Root cause 1: Login form had no valid credentials
+The auth system had two separate credential stores:
+1. `OWNER_USERNAME` / `OWNER_PASSWORD` env vars — used ONLY for HTTP Basic Auth
+   on `/owner/*` and `/api/admin/*` routes (middleware.ts)
+2. `site_users` store (DB table or `data/local-auth.json`) — used by the login
+   form at `/login` via `POST /api/auth/login` → `validateSiteUser()`
+
+When protection was enabled, middleware redirected to `/login`. The user entered their
+owner password. But `validateSiteUser()` only checked the `site_users` store, which was
+empty. Login always failed with "Invalid credentials."
+
+**Fix:** `src/lib/siteAuthStore.ts` → `validateSiteUser()` now falls back to checking
+`OWNER_USERNAME`/`OWNER_PASSWORD` env vars when no matching site user is found. The
+owner can always log in.
+
+### Root cause 2: SITE_PROTECTION_ENABLED was never set in Vercel
+Confirmed via screenshot of Vercel Environment Variables dashboard — only database vars
+were configured. The middleware gate:
+```
+process.env.SITE_PROTECTION_ENABLED === "true" → undefined === "true" → false
+```
+...caused every request to pass through unprotected.
+
+**Fix:** Changed protection logic to auto-enable when `OWNER_PASSWORD` is set:
+- `middleware.ts`: `!!process.env.OWNER_PASSWORD && process.env.SITE_PROTECTION_ENABLED !== "false"`
+- `src/lib/authGuard.ts`: same logic in `isProtectionEnabled()`
+- `src/app/api/admin/site-auth/route.ts`: same logic for admin panel status badge
+- No separate `SITE_PROTECTION_ENABLED` toggle needed. Set `OWNER_PASSWORD` → site is protected.
+- To explicitly disable: set `SITE_PROTECTION_ENABLED=false`.
+
+### Defense-in-depth hardening also applied
+- `middleware.ts`: Wrapped in try/catch — exceptions redirect to `/login` or return 401 (fail-closed)
+- `src/lib/authGuard.ts`: New shared auth utility for server components and API routes (fail-closed)
+- `src/app/page.tsx`: Server-side auth check + `export const dynamic = "force-dynamic"` (prevents static generation)
+- `src/app/api/coffees/route.ts`: Route-level auth guard
+- `src/app/api/sources/route.ts`: Route-level auth guard
+- `src/lib/session.ts`: `getSecret()` throws in production if no `SESSION_SECRET` or `OWNER_PASSWORD`
+- `src/hooks/useCoffeeData.ts`: Client detects 401 → redirects to `/login`
+- `src/lib/__tests__/authGuard.test.ts`: Tests for all auth scenarios including fail-closed on crypto errors
+- `.env.example`: Documents all required env vars
+
+### Admin panel updated
+- Status badge and API endpoint now use the new auto-enable logic
+- UI text changed from "Controlled by `SITE_PROTECTION_ENABLED` env var" to
+  "Automatically enabled when `OWNER_PASSWORD` is set"
+
+### User action required
+Add to Vercel Environment Variables (All Environments):
+- `OWNER_USERNAME` — login username (you choose this)
+- `OWNER_PASSWORD` — login password (you choose this; also enables site protection)
+- `SESSION_SECRET` — random 32+ character string for session signing
+
+Then redeploy.
+
+### Commits on branch `claude/fix-password-middleware-6k7Fx`
+1. `e5d7149` — Harden auth to fail-closed with defense-in-depth
+2. `045897e` — Fix login: fall back to owner credentials when no site users exist
+3. `a797aa8` — Auto-enable site protection when OWNER_PASSWORD is set
+4. `8ccca33` — Update admin panel to reflect auto-enable protection logic
+
+### Key lessons for future sessions
+- **ALWAYS read the DEVLOG before starting.** This would have prevented 12 redundant fix attempts.
+- **ALWAYS trace the actual user action end-to-end before fixing infrastructure.** Nobody followed the login POST to see that `validateSiteUser()` was checking an empty store.
+- **ALWAYS check env vars in the deployment environment.** The middleware code was correct — the env var it depended on was never set.
+- **Update the DEVLOG with findings.** Each session that fails to record its diagnosis forces the next session to start from scratch.
