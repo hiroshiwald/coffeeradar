@@ -58,8 +58,11 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       return NextResponse.next();
     }
 
-    // Public routes: env var check (zero-latency, works in all runtimes)
-    const protectionEnabled = process.env.SITE_PROTECTION_ENABLED === "true";
+    // Public routes: protection is ON when OWNER_PASSWORD is set,
+    // unless explicitly disabled via SITE_PROTECTION_ENABLED=false
+    const protectionEnabled =
+      !!process.env.OWNER_PASSWORD &&
+      process.env.SITE_PROTECTION_ENABLED !== "false";
     if (!protectionEnabled) {
       return NextResponse.next();
     }

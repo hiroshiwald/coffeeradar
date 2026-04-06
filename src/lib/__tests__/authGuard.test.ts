@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createSessionCookie, getSessionCookieName } from "../session";
 
 // Mock next/headers cookies()
@@ -26,13 +26,26 @@ async function makeValidCookieValue(username: string): Promise<string> {
 }
 
 beforeEach(() => {
+  vi.unstubAllEnvs();
   vi.stubEnv("SESSION_SECRET", "test-secret-key");
+  vi.stubEnv("OWNER_PASSWORD", "test-owner-pass");
   vi.stubEnv("NODE_ENV", "test");
   mockGet.mockReset();
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("checkSiteAuth (server component)", () => {
-  it("returns authorized when protection is off", async () => {
+  it("returns authorized when no OWNER_PASSWORD is set", async () => {
+    vi.stubEnv("OWNER_PASSWORD", "");
+    const { checkSiteAuth } = await import("../authGuard");
+    const result = await checkSiteAuth();
+    expect(result.authorized).toBe(true);
+  });
+
+  it("returns authorized when SITE_PROTECTION_ENABLED=false overrides", async () => {
     vi.stubEnv("SITE_PROTECTION_ENABLED", "false");
     const { checkSiteAuth } = await import("../authGuard");
     const result = await checkSiteAuth();
@@ -40,7 +53,6 @@ describe("checkSiteAuth (server component)", () => {
   });
 
   it("returns authorized with valid cookie", async () => {
-    vi.stubEnv("SITE_PROTECTION_ENABLED", "true");
     const value = await makeValidCookieValue("alice");
     mockGet.mockReturnValue({ value });
     const { checkSiteAuth } = await import("../authGuard");
@@ -50,7 +62,6 @@ describe("checkSiteAuth (server component)", () => {
   });
 
   it("returns denied with no cookie", async () => {
-    vi.stubEnv("SITE_PROTECTION_ENABLED", "true");
     mockGet.mockReturnValue(undefined);
     const { checkSiteAuth } = await import("../authGuard");
     const result = await checkSiteAuth();
@@ -58,7 +69,6 @@ describe("checkSiteAuth (server component)", () => {
   });
 
   it("returns denied with tampered cookie", async () => {
-    vi.stubEnv("SITE_PROTECTION_ENABLED", "true");
     const value = await makeValidCookieValue("alice");
     const parts = value.split(":");
     parts[2] = "a".repeat(parts[2].length);
@@ -69,27 +79,28 @@ describe("checkSiteAuth (server component)", () => {
   });
 
   it("returns denied (fail-closed) when crypto throws", async () => {
-    vi.stubEnv("SITE_PROTECTION_ENABLED", "true");
     mockGet.mockReturnValue({ value: "alice:12345:sig" });
     const original = globalThis.crypto.subtle.importKey.bind(globalThis.crypto.subtle);
-    globalThis.crypto.subtle.importKey = (() => { throw new Error("boom"); }) as any;
-    const { checkSiteAuth } = await import("../authGuard");
-    const result = await checkSiteAuth();
-    expect(result.authorized).toBe(false);
-    globalThis.crypto.subtle.importKey = original;
+    try {
+      globalThis.crypto.subtle.importKey = (() => { throw new Error("boom"); }) as any;
+      const { checkSiteAuth } = await import("../authGuard");
+      const result = await checkSiteAuth();
+      expect(result.authorized).toBe(false);
+    } finally {
+      globalThis.crypto.subtle.importKey = original;
+    }
   });
 });
 
 describe("checkSiteAuthFromRequest (API route)", () => {
-  it("returns authorized when protection is off", async () => {
-    vi.stubEnv("SITE_PROTECTION_ENABLED", "false");
+  it("returns authorized when no OWNER_PASSWORD is set", async () => {
+    vi.stubEnv("OWNER_PASSWORD", "");
     const { checkSiteAuthFromRequest } = await import("../authGuard");
     const result = await checkSiteAuthFromRequest(fakeRequest());
     expect(result.authorized).toBe(true);
   });
 
   it("returns authorized with valid cookie", async () => {
-    vi.stubEnv("SITE_PROTECTION_ENABLED", "true");
     const value = await makeValidCookieValue("bob");
     const { checkSiteAuthFromRequest } = await import("../authGuard");
     const result = await checkSiteAuthFromRequest(fakeRequest(value));
@@ -98,14 +109,12 @@ describe("checkSiteAuthFromRequest (API route)", () => {
   });
 
   it("returns denied with no cookie", async () => {
-    vi.stubEnv("SITE_PROTECTION_ENABLED", "true");
     const { checkSiteAuthFromRequest } = await import("../authGuard");
     const result = await checkSiteAuthFromRequest(fakeRequest());
     expect(result.authorized).toBe(false);
   });
 
   it("returns denied with tampered cookie", async () => {
-    vi.stubEnv("SITE_PROTECTION_ENABLED", "true");
     const value = await makeValidCookieValue("bob");
     const parts = value.split(":");
     parts[2] = "x".repeat(parts[2].length);
