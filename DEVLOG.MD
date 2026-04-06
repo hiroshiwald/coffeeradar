@@ -45,6 +45,58 @@
 - No functional implementation yet.
 - Waiting for explicit user approval before coding the feature work.
 
+## 2026-04-06 — Password protection: root cause finally identified
+
+### Problem history
+PRs #9 through #20 (12 attempts!) tried to fix "password not working." Each addressed
+a real secondary issue but none fixed the actual bug. Issues fixed along the way:
+- Edge Runtime incompatibility (#10, #11)
+- Stale caches and cache-busting (#12, #13)
+- Direct Turso query instead of self-fetch (#14)
+- Protection check fallback for Edge middleware (#15, #16)
+- In-memory store actions (#17)
+- Local persistence and fallback (#18)
+- Env var check replacing dynamic DB check (#20)
+
+### Actual root cause (identified in this session)
+**The login form could never succeed because no valid credentials existed.**
+
+The auth system has TWO separate credential stores:
+1. `OWNER_USERNAME` / `OWNER_PASSWORD` env vars → used ONLY for HTTP Basic Auth
+   on `/owner/*` and `/api/admin/*` routes (middleware.ts)
+2. `site_users` store (DB table or `data/local-auth.json`) → used by the login
+   form at `/login` via `POST /api/auth/login` → `validateSiteUser()`
+
+When `SITE_PROTECTION_ENABLED=true`, middleware redirects to `/login`. The user
+enters their OWNER_PASSWORD. But `validateSiteUser()` only checks the `site_users`
+store, which is EMPTY (no `local-auth.json` file, no DB rows). Login always fails
+with "Invalid credentials" regardless of what is entered.
+
+Creating site users requires the admin panel (`/owner/feeds`) which uses Basic Auth
+(OWNER_PASSWORD) — a completely different auth mechanism. Chicken-and-egg problem.
+
+### Fix applied (commit 045897e)
+`src/lib/siteAuthStore.ts` → `validateSiteUser()` now falls back to checking
+`OWNER_USERNAME`/`OWNER_PASSWORD` env vars when no matching site user is found.
+The admin can always log in with owner credentials.
+
+### Also applied (commit e5d7149)
+Defense-in-depth hardening (was the originally requested fix, but not the root cause):
+- `middleware.ts`: try/catch wrapper (fail-closed on exceptions)
+- `src/lib/authGuard.ts`: shared auth utility for server components and API routes
+- `src/app/page.tsx`: server-side auth check + `force-dynamic`
+- `src/app/api/coffees/route.ts`: route-level auth guard
+- `src/app/api/sources/route.ts`: route-level auth guard
+- `src/lib/session.ts`: `getSecret()` throws in production without secrets
+- `src/hooks/useCoffeeData.ts`: 401 → redirect to /login
+- `src/lib/__tests__/authGuard.test.ts`: fail-closed tests
+- `.env.example`: documents required env vars
+
+### Key lesson for future sessions
+**ALWAYS trace the actual user action end-to-end before fixing infrastructure.**
+The middleware was never the problem — it correctly blocked unauthenticated requests.
+The problem was downstream: the login endpoint had no valid credentials to check against.
+
 ## 2026-04-01 — Implementation after approval
 
 ### Implemented
