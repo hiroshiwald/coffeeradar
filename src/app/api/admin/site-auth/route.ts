@@ -5,7 +5,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const users = await listSiteUsers();
-  const protectionEnabled = process.env.SITE_PROTECTION_ENABLED === "true";
+  const protectionEnabled =
+    !!process.env.OWNER_PASSWORD &&
+    process.env.SITE_PROTECTION_ENABLED !== "false";
   return NextResponse.json({ users, protectionEnabled });
 }
 
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
     }
     case "set_protection": {
       return NextResponse.json(
-        { error: "Protection is controlled via the SITE_PROTECTION_ENABLED environment variable. Update it in your hosting dashboard and redeploy." },
+        { error: "Protection is automatically enabled when OWNER_PASSWORD is set. To disable, set SITE_PROTECTION_ENABLED=false in your hosting dashboard and redeploy." },
         { status: 400 }
       );
     }
