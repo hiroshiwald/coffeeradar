@@ -184,7 +184,7 @@ export default function OwnerFeedsPage() {
           {protectionEnabled
             ? "Site is password-protected. Visitors must log in."
             : "Site is public. Anyone can access it."}
-          {" "}Controlled by <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">SITE_PROTECTION_ENABLED</code> env var.
+          {" "}Automatically enabled when <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">OWNER_PASSWORD</code> is set.
         </p>
 
         {protectionEnabled && siteUsers.length === 0 && (
