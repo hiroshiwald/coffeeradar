@@ -7,7 +7,10 @@ type AuthResult = { authorized: boolean; username: string };
 const DENIED: AuthResult = { authorized: false, username: "" };
 
 function isProtectionEnabled(): boolean {
-  return process.env.SITE_PROTECTION_ENABLED === "true";
+  return (
+    !!process.env.OWNER_PASSWORD &&
+    process.env.SITE_PROTECTION_ENABLED !== "false"
+  );
 }
 
 /** For use in Server Components (reads cookies via next/headers). */

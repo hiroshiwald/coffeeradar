@@ -92,10 +92,29 @@ Defense-in-depth hardening (was the originally requested fix, but not the root c
 - `src/lib/__tests__/authGuard.test.ts`: fail-closed tests
 - `.env.example`: documents required env vars
 
+### DEEPER root cause (also identified this session, after screenshot of Vercel env vars)
+The middleware ALSO never ran its protection logic because `SITE_PROTECTION_ENABLED`
+was never set in Vercel environment variables. Only TURSO_DATABASE_URL, TURSO_AUTH_TOKEN,
+and DATABASE_URL vars were configured. The middleware gate at line 62:
+  `process.env.SITE_PROTECTION_ENABLED === "true"` → `undefined === "true"` → false
+...caused every request to pass through. All 12 PRs changed code behind this gate.
+
+### Final fix
+Changed protection logic to auto-enable when `OWNER_PASSWORD` is set:
+- `middleware.ts`: `!!process.env.OWNER_PASSWORD && process.env.SITE_PROTECTION_ENABLED !== "false"`
+- `src/lib/authGuard.ts`: same logic in `isProtectionEnabled()`
+- No separate toggle needed. Set OWNER_PASSWORD → site is protected.
+- To explicitly disable: set `SITE_PROTECTION_ENABLED=false`
+
+### User must add to Vercel Environment Variables
+- `OWNER_USERNAME` — login username
+- `OWNER_PASSWORD` — login password (also enables site protection)
+- `SESSION_SECRET` — random 32+ char string for session signing
+
 ### Key lesson for future sessions
 **ALWAYS trace the actual user action end-to-end before fixing infrastructure.**
-The middleware was never the problem — it correctly blocked unauthenticated requests.
-The problem was downstream: the login endpoint had no valid credentials to check against.
+Check env vars first. Check the deployment config. Read the DEVLOG before starting.
+The middleware code was fine — the env var it depended on was never set.
 
 ## 2026-04-01 — Implementation after approval
 
