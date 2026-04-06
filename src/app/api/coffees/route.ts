@@ -3,11 +3,17 @@ import { hasTurso, initDb, getCoffees, getFeedHealth, upsertCoffees, saveFeedHea
 import { fetchAllFeeds } from "@/lib/feedFetcher";
 import { FALLBACK_COFFEES } from "@/lib/fallback";
 import { ApiResponse } from "@/lib/types";
+import { checkSiteAuthFromRequest } from "@/lib/authGuard";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const { authorized } = await checkSiteAuthFromRequest(request);
+  if (!authorized) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   const forceRefresh = request.nextUrl.searchParams.get("refresh") === "true";
 
   // If Turso is not configured, fall back to direct feed fetching (local dev)

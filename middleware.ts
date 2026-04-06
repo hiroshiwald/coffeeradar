@@ -35,49 +35,60 @@ function handleBasicAuth(req: NextRequest): NextResponse {
 }
 
 export async function middleware(req: NextRequest): Promise<NextResponse> {
-  const { pathname } = req.nextUrl;
+  try {
+    const { pathname } = req.nextUrl;
 
-  // Owner/admin routes: existing Basic Auth (unchanged)
-  if (pathname.startsWith("/owner") || pathname.startsWith("/api/admin")) {
-    return handleBasicAuth(req);
+    // Owner/admin routes: existing Basic Auth (unchanged)
+    if (pathname.startsWith("/owner") || pathname.startsWith("/api/admin")) {
+      return handleBasicAuth(req);
+    }
+
+    // Login page: always accessible
+    if (pathname === "/login") {
+      return NextResponse.next();
+    }
+
+    // Auth API routes: always accessible (login/logout endpoints)
+    if (pathname.startsWith("/api/auth")) {
+      return NextResponse.next();
+    }
+
+    // Cron endpoint: uses its own Bearer token auth
+    if (pathname.startsWith("/api/cron")) {
+      return NextResponse.next();
+    }
+
+    // Public routes: env var check (zero-latency, works in all runtimes)
+    const protectionEnabled = process.env.SITE_PROTECTION_ENABLED === "true";
+    if (!protectionEnabled) {
+      return NextResponse.next();
+    }
+
+    // Protection is on: validate session cookie
+    const sessionCookie = req.cookies.get(getSessionCookieName())?.value;
+    if (sessionCookie) {
+      const { valid } = await validateSessionCookie(sessionCookie);
+      if (valid) return NextResponse.next();
+    }
+
+    // No valid session: redirect pages, 401 for API
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
+  } catch {
+    // Fail-closed: any unexpected error denies access
+    const { pathname } = req.nextUrl;
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
   }
-
-  // Login page: always accessible
-  if (pathname === "/login") {
-    return NextResponse.next();
-  }
-
-  // Auth API routes: always accessible (login/logout endpoints)
-  if (pathname.startsWith("/api/auth")) {
-    return NextResponse.next();
-  }
-
-  // Cron endpoint: uses its own Bearer token auth
-  if (pathname.startsWith("/api/cron")) {
-    return NextResponse.next();
-  }
-
-  // Public routes: env var check (zero-latency, works in all runtimes)
-  const protectionEnabled = process.env.SITE_PROTECTION_ENABLED === "true";
-  if (!protectionEnabled) {
-    return NextResponse.next();
-  }
-
-  // Protection is on: validate session cookie
-  const sessionCookie = req.cookies.get(getSessionCookieName())?.value;
-  if (sessionCookie) {
-    const { valid } = await validateSessionCookie(sessionCookie);
-    if (valid) return NextResponse.next();
-  }
-
-  // No valid session: redirect pages, 401 for API
-  if (pathname.startsWith("/api/")) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-
-  const loginUrl = new URL("/login", req.url);
-  loginUrl.searchParams.set("redirect", pathname);
-  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {

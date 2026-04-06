@@ -12,6 +12,10 @@ export function useCoffeeData() {
     try {
       const url = refresh ? "/api/coffees?refresh=true" : "/api/coffees";
       const res = await fetch(url);
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
       const json: ApiResponse = await res.json();
       setData(json);
     } catch {

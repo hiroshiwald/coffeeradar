@@ -7,7 +7,12 @@ const COOKIE_NAME = "__coffeeradar_session";
 const MAX_AGE_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 function getSecret(): string {
-  return process.env.SESSION_SECRET || process.env.OWNER_PASSWORD || "dev-fallback-secret";
+  const secret = process.env.SESSION_SECRET || process.env.OWNER_PASSWORD;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET or OWNER_PASSWORD must be set in production");
+  }
+  return "dev-fallback-secret";
 }
 
 async function hmacSign(data: string): Promise<string> {
