@@ -63,6 +63,7 @@ export async function removeSiteUser(username: string): Promise<void> {
 }
 
 export async function validateSiteUser(username: string, password: string): Promise<boolean> {
+  // Check site users store first
   let user: SiteUser | null;
   if (hasTurso()) {
     await initDb();
@@ -71,7 +72,17 @@ export async function validateSiteUser(username: string, password: string): Prom
     user = memGetSiteUserByUsername(username);
   }
 
-  if (!user) return false;
-  return verifyPassword(password, user.salt, user.passwordHash);
+  if (user) {
+    return verifyPassword(password, user.salt, user.passwordHash);
+  }
+
+  // Fall back to owner credentials so the admin can always log in
+  const ownerUser = process.env.OWNER_USERNAME;
+  const ownerPass = process.env.OWNER_PASSWORD;
+  if (ownerUser && ownerPass && username === ownerUser && password === ownerPass) {
+    return true;
+  }
+
+  return false;
 }
 
