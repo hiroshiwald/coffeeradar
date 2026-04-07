@@ -79,17 +79,14 @@ function collectNotesFromPatterns(lower: string, found: Set<string>): void {
           found.add(normalizeNoteCase(cleaned));
           continue;
         }
-        for (const word of NOTE_WORDS) {
-          if (cleaned.includes(word)) found.add(normalizeNoteCase(word));
+        // Within an explicit tasting-notes segment only, allow whole-word
+        // subword matches so "dark chocolate" yields "Chocolate". Never run
+        // this against arbitrary body copy.
+        for (const sub of cleaned.split(/\s+/)) {
+          if (NOTE_WORDS.has(sub)) found.add(normalizeNoteCase(sub));
         }
       }
     }
-  }
-}
-
-function collectNotesFromFullText(lower: string, found: Set<string>): void {
-  for (const word of NOTE_WORDS) {
-    if (lower.includes(word)) found.add(normalizeNoteCase(word));
   }
 }
 
@@ -99,7 +96,6 @@ export function extractNotes(text: string, shopifyTags: string[]): string[] {
 
   collectNotesFromTags(shopifyTags, found);
   collectNotesFromPatterns(lower, found);
-  collectNotesFromFullText(lower, found);
 
   const all = Array.from(found);
   const flavors = all.filter((n) => !TEXTURE_NOTE_WORDS.has(n));

@@ -37,6 +37,12 @@ export default function CoffeeTable() {
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">New releases from specialty roasters</p>
         </div>
         <div className="flex items-center gap-2">
+          <a
+            href="/roasters"
+            className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+          >
+            Roasters
+          </a>
           <ThemeToggle />
         </div>
       </div>
@@ -58,16 +64,6 @@ export default function CoffeeTable() {
       <div className="flex flex-wrap items-center gap-4 mb-4 text-xs text-gray-500 dark:text-gray-400">
         {meta && (
           <>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              {meta.healthy} healthy
-            </span>
-            {meta.failed > 0 && (
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-red-400" />
-                {meta.failed} failed
-              </span>
-            )}
             <span>Updated {timeAgo(meta.lastRefresh)}</span>
             {meta.isFallback && (
               <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
