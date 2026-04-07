@@ -138,31 +138,45 @@ export async function toggleFeedSource(url: string): Promise<void> {
   });
 }
 
+// Generic chunked batch insert. Splits `rows` into groups of `chunkSize`
+// and runs each group as a single libSQL batch. Used by upsertCoffees and
+// saveFeedResults so we don't reimplement the chunking loop.
+export async function chunkedBatchInsert<T>(
+  db: Client,
+  sql: string,
+  rows: readonly T[],
+  toArgs: (row: T) => unknown[],
+  chunkSize = 50,
+): Promise<void> {
+  if (rows.length === 0) return;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    await db.batch(chunk.map((row) => ({ sql, args: toArgs(row) as never })));
+  }
+}
+
 export async function upsertCoffees(entries: CoffeeEntry[]): Promise<void> {
   const db = getClient();
   if (!db || entries.length === 0) return;
-
-  for (let i = 0; i < entries.length; i += 50) {
-    const chunk = entries.slice(i, i + 50);
-    const stmts = chunk.map((e) => ({
-      sql: `INSERT OR REPLACE INTO coffees (id, roaster, coffee, type, process, tasting_notes, price, date, link, image_url, is_merch)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        e.id,
-        e.roaster,
-        e.coffee,
-        e.type,
-        e.process,
-        JSON.stringify(e.tastingNotes),
-        e.price,
-        e.date,
-        e.link,
-        e.imageUrl,
-        e.isMerch ? 1 : 0,
-      ],
-    }));
-    await db.batch(stmts);
-  }
+  await chunkedBatchInsert(
+    db,
+    `INSERT OR REPLACE INTO coffees (id, roaster, coffee, type, process, tasting_notes, price, date, link, image_url, is_merch)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    entries,
+    (e) => [
+      e.id,
+      e.roaster,
+      e.coffee,
+      e.type,
+      e.process,
+      JSON.stringify(e.tastingNotes),
+      e.price,
+      e.date,
+      e.link,
+      e.imageUrl,
+      e.isMerch ? 1 : 0,
+    ],
+  );
 }
 
 export async function getCoffees(): Promise<CoffeeEntry[]> {
@@ -249,14 +263,12 @@ export async function cleanOldData(): Promise<{ coffees: number; feedResults: nu
 export async function saveFeedResults(results: { url: string; status: string }[]): Promise<void> {
   const db = getClient();
   if (!db || results.length === 0) return;
-  for (let i = 0; i < results.length; i += 50) {
-    const chunk = results.slice(i, i + 50);
-    const stmts = chunk.map((r) => ({
-      sql: `INSERT OR REPLACE INTO feed_results (url, status, last_checked) VALUES (?, ?, datetime('now'))`,
-      args: [r.url, r.status],
-    }));
-    await db.batch(stmts);
-  }
+  await chunkedBatchInsert(
+    db,
+    `INSERT OR REPLACE INTO feed_results (url, status, last_checked) VALUES (?, ?, datetime('now'))`,
+    results,
+    (r) => [r.url, r.status],
+  );
 }
 
 export async function getFeedResults(): Promise<Record<string, string>> {
