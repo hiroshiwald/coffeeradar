@@ -94,10 +94,25 @@ describe("extractNotes", () => {
     expect(notes).toContain("Caramel");
   });
 
-  it("extracts notes from keyword scanning in text", () => {
-    const notes = extractNotes("A coffee with chocolate and blueberry flavors", []);
+  it("extracts notes from explicit flavour pattern", () => {
+    const notes = extractNotes("Flavours: chocolate and blueberry", []);
     expect(notes).toContain("Chocolate");
     expect(notes).toContain("Blueberry");
+  });
+
+  it("does not hallucinate notes from unrelated body copy", () => {
+    // No "notes:", "flavours:", "taste:" etc. — the words chocolate/honey/clean
+    // appear in marketing copy but should NOT be extracted as tasting notes.
+    const notes = extractNotes(
+      "Our clean water process and honey-colored chocolate packaging make this a special coffee.",
+      []
+    );
+    expect(notes).toEqual([]);
+  });
+
+  it("extracts subword flavors inside an explicit segment", () => {
+    const notes = extractNotes("Tasting notes: dark chocolate, brown sugar", []);
+    expect(notes).toContain("Chocolate");
   });
 
   it("caps results at 6 notes", () => {

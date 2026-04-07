@@ -17,15 +17,19 @@ export function filterCoffees(coffees: CoffeeEntry[], filters: CoffeeFilters): C
   if (!filters.showMerch) list = list.filter((c) => !c.isMerch);
 
   if (filters.search) {
-    const q = filters.search.toLowerCase();
-    list = list.filter(
-      (c) =>
-        c.roaster.toLowerCase().includes(q) ||
-        c.coffee.toLowerCase().includes(q) ||
-        c.type.toLowerCase().includes(q) ||
-        c.process.toLowerCase().includes(q) ||
-        c.tastingNotes.some((n) => n.toLowerCase().includes(q))
-    );
+    const tokens = filters.search.toLowerCase().split(/\s+/).filter(Boolean);
+    if (tokens.length > 0) {
+      list = list.filter((c) => {
+        const haystacks = [
+          c.roaster.toLowerCase(),
+          c.coffee.toLowerCase(),
+          c.type.toLowerCase(),
+          c.process.toLowerCase(),
+          ...c.tastingNotes.map((n) => n.toLowerCase()),
+        ];
+        return tokens.every((tok) => haystacks.some((h) => h.includes(tok)));
+      });
+    }
   }
 
   if (filters.filterType) list = list.filter((c) => c.type === filters.filterType);
