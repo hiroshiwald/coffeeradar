@@ -185,17 +185,24 @@ npm test          # Run all tests (single run)
 npm run test:watch  # Watch mode
 ```
 
-The project uses **Vitest** with 109 tests across 9 test files:
+The project uses **Vitest**. See [TEST_PLAN.md](TEST_PLAN.md) for the full test plan, coverage matrix, and manual e2e smoke checklist.
+
+Current suites in `src/lib/__tests__/`:
 
 - `session.test.ts` — Cookie creation, validation, tampering detection, expiry
 - `crypto.test.ts` — Password hashing, verification, salt randomness
 - `authGuard.test.ts` — Auth guard for server components and API routes, fail-closed behavior
 - `feedParser.test.ts` — Atom/RSS feed parsing and normalization
+- `feedParserHelpers.test.ts` — Pure helpers for image/price/text extraction
 - `feedFetcher.test.ts` — Concurrent feed fetch orchestration
 - `coffeeFilters.test.ts` — Client-side filtering logic
 - `formatters.test.ts` — Date and text formatting utilities
 - `noteColors.test.ts` — Tasting note color mapping
 - `heuristics.test.ts` — Coffee type and process heuristics
+- `heuristicsHelpers.test.ts` — Tokenization, noise filtering, and case normalization
+- `db.test.ts` — `chunkedBatchInsert` helper
+- `sourceStore.test.ts` — `initDb` memoization
+- `siteAuth.test.ts` — `isAuthData` type guard
 
 ---
 
@@ -235,7 +242,11 @@ This cleanup is run during cron refresh and manual refresh flows.
 - `src/app/page.tsx` — Home page (server component with auth guard).
 - `src/app/login/page.tsx` — Login page.
 - `src/app/owner/feeds/page.tsx` — Owner feed admin UI and site user management.
-- `src/components/CoffeeTable.tsx` — Main data table UI and client-side filtering/sorting.
+- `src/components/CoffeeTable.tsx` — Thin orchestrator that wires the data hook to the table sub-components.
+- `src/components/coffee-table/useCoffeeFilters.ts` — Client-side filter/sort state hook.
+- `src/components/coffee-table/CoffeeTableFilters.tsx` — Search/filter/refresh control bar.
+- `src/components/coffee-table/CoffeeTableHeader.tsx` — Sortable header row.
+- `src/components/coffee-table/CoffeeTableRow.tsx` — Single coffee row.
 - `src/components/ThemeToggle.tsx` — Dark/light mode toggle.
 
 ### API routes
@@ -257,13 +268,16 @@ This cleanup is run during cron refresh and manual refresh flows.
 
 ### Feed pipeline
 - `src/lib/feedFetcher.ts` — Concurrent feed fetch orchestration.
-- `src/lib/feedParser.ts` — Atom/RSS parsing and normalization.
-- `src/lib/feedDiscovery.ts` — Store URL to feed URL discovery.
-- `src/lib/heuristics.ts` — Coffee type and process detection heuristics.
+- `src/lib/feedParser.ts` — Atom/RSS parsing and normalization (delegates extraction to helpers).
+- `src/lib/feedParserHelpers.ts` — Pure helpers for image, price, and text extraction.
+- `src/lib/feedDiscovery.ts` — Store URL to feed URL discovery (logs failures via `logger`).
+- `src/lib/heuristics.ts` — Coffee type, process, and tasting note logic.
+- `src/lib/heuristicsData.ts` — Static vocabularies and regexes consumed by `heuristics.ts`.
+- `src/lib/logger.ts` — Tiny console wrapper, silent under Vitest.
 
 ### Data and storage
-- `src/lib/db.ts` — Turso schema and persistence helpers.
-- `src/lib/sourceStore.ts` — Unified source storage abstraction.
+- `src/lib/db.ts` — Turso schema and persistence helpers (uses `chunkedBatchInsert`).
+- `src/lib/sourceStore.ts` — Unified source storage abstraction (memoizes `initDb` per process).
 - `src/lib/sources.ts` — In-memory source/health state.
 - `src/lib/fallback.ts` — Fallback coffee data when feeds are unavailable.
 - `data/sources.json` — Seed source list.

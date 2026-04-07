@@ -80,15 +80,19 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Module-scoped in-memory cache for the local-dev (no-Turso) path. Scoped to
+// this module rather than `globalThis` so it can't leak across unrelated
+// modules and is easy to reset in tests.
+const LOCAL_CACHE_TTL_MS = 30 * 60 * 1000;
+let localCache: { data: ApiResponse; ts: number } | null = null;
+
 // Fallback for local dev without Turso
 async function handleWithoutDb(forceRefresh: boolean): Promise<NextResponse> {
-  // Simple in-memory approach for local dev
-  if (!forceRefresh && globalCache && Date.now() - globalCache.ts < 30 * 60 * 1000) {
-    return NextResponse.json(globalCache.data);
+  if (!forceRefresh && localCache && Date.now() - localCache.ts < LOCAL_CACHE_TTL_MS) {
+    return NextResponse.json(localCache.data);
   }
   try {
     const { coffees, healthy, failed, total, feedResults } = await fetchAllFeeds();
-    // Store per-feed health in memory for admin panel
     const { setInMemoryHealth } = await import("@/lib/sources");
     const healthMap: Record<string, string> = {};
     for (const r of feedResults) healthMap[r.url] = r.status;
@@ -97,7 +101,7 @@ async function handleWithoutDb(forceRefresh: boolean): Promise<NextResponse> {
       coffees: coffees.length > 0 ? coffees : FALLBACK_COFFEES,
       meta: { healthy, failed, total, lastRefresh: new Date().toISOString(), isFallback: coffees.length === 0 },
     };
-    globalCache = { data: response, ts: Date.now() };
+    localCache = { data: response, ts: Date.now() };
     return NextResponse.json(response);
   } catch {
     return NextResponse.json({
@@ -106,5 +110,3 @@ async function handleWithoutDb(forceRefresh: boolean): Promise<NextResponse> {
     } satisfies ApiResponse);
   }
 }
-
-let globalCache: { data: ApiResponse; ts: number } | null = null;

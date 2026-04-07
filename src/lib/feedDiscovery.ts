@@ -1,4 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
+import { logger } from "./logger";
 
 const COMMON_FEED_PATHS = [
   "/feed",
@@ -38,9 +39,13 @@ async function fetchText(url: string): Promise<string | null> {
       },
       redirect: "follow",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      logger.warn("feedDiscovery: non-ok response", { url, status: res.status });
+      return null;
+    }
     return await res.text();
-  } catch {
+  } catch (err) {
+    logger.warn("feedDiscovery: fetch failed", { url, err });
     return null;
   }
 }
@@ -56,7 +61,8 @@ function isValidFeedUrl(url: string, body: string): boolean {
     const parser = new XMLParser({ ignoreAttributes: false });
     const parsed = parser.parse(body);
     return !!(parsed?.rss || parsed?.feed || parsed?.["rdf:RDF"] || parsed?.["rdf:rdf"] || url.includes(".atom") || url.includes("rss"));
-  } catch {
+  } catch (err) {
+    logger.warn("feedDiscovery: invalid feed XML", { url, err });
     return false;
   }
 }

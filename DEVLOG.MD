@@ -154,3 +154,84 @@ Then redeploy.
 - **ALWAYS trace the actual user action end-to-end before fixing infrastructure.** Nobody followed the login POST to see that `validateSiteUser()` was checking an empty store.
 - **ALWAYS check env vars in the deployment environment.** The middleware code was correct — the env var it depended on was never set.
 - **Update the DEVLOG with findings.** Each session that fails to record its diagnosis forces the next session to start from scratch.
+
+---
+
+## 2026-04-07 — Broad refactor + test plan
+
+### Scope
+A cleanup pass after the 2026-04 auth hardening. Goals:
+- Cut down a 319-line `CoffeeTable.tsx` and a 302-line `feedParser.ts`.
+- Remove `any` types from `siteAuth.ts`.
+- Stop swallowing errors silently in feed parsing/discovery.
+- Dedupe chunked batch inserts in `db.ts`.
+- Stop calling `initDb()` on every read in `sourceStore.ts`.
+- Drop the `globalThis`-style cache in `/api/coffees`.
+- Add new unit tests and a written test plan.
+
+### Phases
+- **A — leaf utilities.** Added `lib/logger.ts` (silent under Vitest).
+  Extracted constants from `heuristics.ts` into `lib/heuristicsData.ts`.
+  Split `extractNotes` into `tokenizeNotesSegment`,
+  `filterNoiseTokens`, `normalizeNoteCase`, plus three small `collect*`
+  helpers; the public `extractNotes` is now a short orchestrator.
+  Added `lib/feedParserHelpers.ts` with `decodeHtml`, `deepString`,
+  `deepText`, `extractImage*`, `extractShopifyTags`,
+  `extractProductType`, `extractShopifyPrice`. `feedParser.ts` now just
+  selects entries and maps them through the helpers, and routes
+  parse failures through `logger.warn` instead of `catch {}`.
+- **B — db / storage.** Added a generic `chunkedBatchInsert<T>` helper
+  in `db.ts` and used it from both `upsertCoffees` and
+  `saveFeedResults`. Memoized `initDb()` in `sourceStore.ts` via a
+  module-scoped `initPromise` (with `__resetSourceStoreInitForTests`
+  for tests). Replaced all four `any` casts in `siteAuth.ts` with a
+  proper `AuthData` interface and an `isAuthData` type guard.
+- **C — api / observability.** Renamed the `globalCache` in
+  `/api/coffees` to a clearly module-scoped `localCache` with a
+  documented TTL constant. Wired `feedDiscovery.ts` to log
+  fetch failures and invalid feed XML through `logger.warn`.
+- **D — component split.** Created `src/components/coffee-table/`
+  with `useCoffeeFilters.ts`, `CoffeeTableFilters.tsx`,
+  `CoffeeTableHeader.tsx`, `CoffeeTableRow.tsx`. `CoffeeTable.tsx`
+  shrunk from 319 lines to a thin orchestrator that wires the data
+  hook to those sub-components. The default export and the
+  `@/components/CoffeeTable` import path are unchanged, so no callers
+  needed updates.
+
+### Behavior delta
+None intended. The only user-visible change is the rename of the
+local-dev cache variable in `/api/coffees`; semantics are identical.
+
+### New tests
++45 tests across five files, all green alongside the existing 109:
+
+- `src/lib/__tests__/feedParserHelpers.test.ts` — image / price /
+  text helpers, with fixtures for s:image, media:content,
+  media:thumbnail, itunes:image, and HTML scrape fallback.
+- `src/lib/__tests__/heuristicsHelpers.test.ts` — tokenize, filter,
+  normalize.
+- `src/lib/__tests__/db.test.ts` — `chunkedBatchInsert`: empty,
+  exact-multiple, ragged, and error-propagation cases against a fake
+  client.
+- `src/lib/__tests__/sourceStore.test.ts` — verifies `initDb` is called
+  exactly once across parallel reads, and again after the test reset
+  helper.
+- `src/lib/__tests__/siteAuth.test.ts` — `isAuthData` type guard.
+
+`npm test` reports 14 files / 154 tests passing. `npx tsc --noEmit`
+is clean.
+
+### Docs
+- `README.md` — repository map updated to list the new
+  `coffee-table/` directory and the new `lib/` files; testing section
+  links to `TEST_PLAN.md`.
+- `TEST_PLAN.md` (new) — coverage matrix, refactor-specific
+  assertions, manual e2e smoke checklist, known gaps.
+
+### Follow-ups
+- Component tests for `CoffeeTable*` (needs `jsdom` +
+  `@testing-library/react`).
+- API route test for `/api/coffees` (mock `getCoffees`,
+  `fetchAllFeeds`, assert local cache TTL).
+- Playwright e2e covering the first 5 smoke steps in `TEST_PLAN.md`.
+- Add coverage gating to CI once the above land.
