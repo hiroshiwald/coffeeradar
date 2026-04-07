@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hasTurso, initDb, getFeedResults } from "@/lib/db";
+import {
+  hasTurso,
+  initDb,
+  getFeedResults,
+  upsertFeedSuggestion,
+  listFeedSuggestions,
+  deleteFeedSuggestion,
+} from "@/lib/db";
 import { getInMemoryHealth } from "@/lib/sources";
 import { addOrUpdateMasterSource, listMasterSources, removeMasterSource, toggleMasterSource } from "@/lib/sourceStore";
 import { discoverFeedFromStoreUrl } from "@/lib/feedDiscovery";
+import { suggestReplacementsForFailed } from "@/lib/feedSuggestion";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +24,8 @@ export async function GET() {
   }
 
   const sources = await listMasterSources();
-  return NextResponse.json({ sources, health });
+  const suggestions = hasTurso() ? await listFeedSuggestions() : [];
+  return NextResponse.json({ sources, health, suggestions });
 }
 
 export async function POST(request: NextRequest) {
@@ -45,6 +54,60 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ sources, discovery });
+  }
+
+  if (action === "rescan_failed") {
+    if (hasTurso()) await initDb();
+    const health = hasTurso() ? await getFeedResults() : getInMemoryHealth();
+    const all = await listMasterSources();
+    const failed = all.filter((s) => health[s.url] === "error" && s.enabled !== false);
+
+    const results = await suggestReplacementsForFailed(failed);
+
+    if (hasTurso()) {
+      for (const r of results) {
+        await upsertFeedSuggestion({
+          sourceUrl: r.sourceUrl,
+          suggestedFeedUrl: r.candidate?.feedUrl ?? null,
+          suggestedWebsite: r.candidate?.website ?? null,
+          preflightOk: !!r.preflight?.ok,
+          reason: r.candidate ? r.preflight?.reason ?? "ok" : r.reason ?? "no_candidate_found",
+        });
+      }
+    }
+
+    const suggestions = hasTurso() ? await listFeedSuggestions() : [];
+    return NextResponse.json({ scanned: failed.length, results, suggestions });
+  }
+
+  if (action === "approve_suggestion") {
+    const { oldUrl, newUrl, newWebsite, name } = body;
+    if (!oldUrl || !newUrl || !name) {
+      return NextResponse.json({ error: "oldUrl, newUrl, and name are required" }, { status: 400 });
+    }
+    await addOrUpdateMasterSource({
+      name,
+      url: newUrl,
+      website: newWebsite || newUrl,
+      enabled: true,
+    });
+    if (oldUrl !== newUrl) {
+      await removeMasterSource(oldUrl);
+    }
+    if (hasTurso()) {
+      await deleteFeedSuggestion(oldUrl);
+    }
+    const sources = await listMasterSources();
+    const suggestions = hasTurso() ? await listFeedSuggestions() : [];
+    return NextResponse.json({ sources, suggestions });
+  }
+
+  if (action === "dismiss_suggestion") {
+    const { oldUrl } = body;
+    if (!oldUrl) return NextResponse.json({ error: "oldUrl required" }, { status: 400 });
+    if (hasTurso()) await deleteFeedSuggestion(oldUrl);
+    const suggestions = hasTurso() ? await listFeedSuggestions() : [];
+    return NextResponse.json({ suggestions });
   }
 
   switch (action) {
