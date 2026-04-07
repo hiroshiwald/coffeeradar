@@ -60,6 +60,14 @@ export async function initDb(): Promise<void> {
       updated_at TEXT DEFAULT (datetime('now'))
     )`,
     `CREATE INDEX IF NOT EXISTS idx_feed_sources_enabled ON feed_sources(enabled)`,
+    `CREATE TABLE IF NOT EXISTS feed_suggestions (
+      source_url TEXT PRIMARY KEY,
+      suggested_feed_url TEXT,
+      suggested_website TEXT,
+      preflight_ok INTEGER NOT NULL DEFAULT 0,
+      reason TEXT,
+      checked_at TEXT DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS site_users (
       username TEXT PRIMARY KEY,
       password_hash TEXT NOT NULL,
@@ -280,6 +288,54 @@ export async function getFeedResults(): Promise<Record<string, string>> {
     map[String(row.url)] = String(row.status);
   }
   return map;
+}
+
+// --- Feed Suggestions ---
+
+export interface FeedSuggestionRow {
+  sourceUrl: string;
+  suggestedFeedUrl: string | null;
+  suggestedWebsite: string | null;
+  preflightOk: boolean;
+  reason: string | null;
+  checkedAt: string;
+}
+
+export async function upsertFeedSuggestion(s: {
+  sourceUrl: string;
+  suggestedFeedUrl?: string | null;
+  suggestedWebsite?: string | null;
+  preflightOk: boolean;
+  reason?: string | null;
+}): Promise<void> {
+  const db = getClient();
+  if (!db) return;
+  await db.execute({
+    sql: `INSERT OR REPLACE INTO feed_suggestions
+          (source_url, suggested_feed_url, suggested_website, preflight_ok, reason, checked_at)
+          VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+    args: [s.sourceUrl, s.suggestedFeedUrl ?? null, s.suggestedWebsite ?? null, s.preflightOk ? 1 : 0, s.reason ?? null],
+  });
+}
+
+export async function listFeedSuggestions(): Promise<FeedSuggestionRow[]> {
+  const db = getClient();
+  if (!db) return [];
+  const result = await db.execute(`SELECT source_url, suggested_feed_url, suggested_website, preflight_ok, reason, checked_at FROM feed_suggestions`);
+  return result.rows.map((row) => ({
+    sourceUrl: String(row.source_url),
+    suggestedFeedUrl: row.suggested_feed_url ? String(row.suggested_feed_url) : null,
+    suggestedWebsite: row.suggested_website ? String(row.suggested_website) : null,
+    preflightOk: Number(row.preflight_ok) === 1,
+    reason: row.reason ? String(row.reason) : null,
+    checkedAt: String(row.checked_at),
+  }));
+}
+
+export async function deleteFeedSuggestion(sourceUrl: string): Promise<void> {
+  const db = getClient();
+  if (!db) return;
+  await db.execute({ sql: `DELETE FROM feed_suggestions WHERE source_url = ?`, args: [sourceUrl] });
 }
 
 // --- Site Users ---

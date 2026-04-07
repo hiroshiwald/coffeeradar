@@ -10,6 +10,15 @@ interface SiteUserInfo {
   createdAt: string;
 }
 
+interface FeedSuggestion {
+  sourceUrl: string;
+  suggestedFeedUrl: string | null;
+  suggestedWebsite: string | null;
+  preflightOk: boolean;
+  reason: string | null;
+  checkedAt: string;
+}
+
 export default function OwnerFeedsPage() {
   const [sources, setSources] = useState<FeedSource[]>([]);
   const [health, setHealth] = useState<Record<string, string>>({});
@@ -25,6 +34,8 @@ export default function OwnerFeedsPage() {
   const [busy, setBusy] = useState(false);
 
   // Site access control state
+  const [suggestions, setSuggestions] = useState<FeedSuggestion[]>([]);
+  const [rescanning, setRescanning] = useState(false);
   const [siteUsers, setSiteUsers] = useState<SiteUserInfo[]>([]);
   const [protectionEnabled, setProtectionEnabled] = useState(false);
   const [newUsername, setNewUsername] = useState("");
@@ -37,8 +48,44 @@ export default function OwnerFeedsPage() {
     const data = await res.json();
     setSources(data.sources ?? []);
     if (data.health) setHealth(data.health);
+    if (data.suggestions) setSuggestions(data.suggestions);
     setLoading(false);
   }, []);
+
+  const suggestionsByUrl: Record<string, FeedSuggestion> = {};
+  for (const s of suggestions) suggestionsByUrl[s.sourceUrl] = s;
+
+  async function handleRescanFailed() {
+    setRescanning(true);
+    setStatusMessage("Rescanning failed feeds...");
+    const res = await fetch("/api/admin/sources", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "rescan_failed" }),
+    });
+    const data = await res.json();
+    if (data.suggestions) setSuggestions(data.suggestions);
+    setStatusMessage(res.ok ? `Rescanned ${data.scanned ?? 0} failed feeds.` : data.error ?? "Rescan failed.");
+    setRescanning(false);
+  }
+
+  async function handleApproveSuggestion(source: FeedSource, suggestion: FeedSuggestion) {
+    if (!suggestion.suggestedFeedUrl) return;
+    await doAction("approve_suggestion", {
+      oldUrl: source.url,
+      newUrl: suggestion.suggestedFeedUrl,
+      newWebsite: suggestion.suggestedWebsite ?? source.website,
+      name: source.name,
+    });
+    const res = await fetch("/api/admin/sources");
+    const data = await res.json();
+    if (data.suggestions) setSuggestions(data.suggestions);
+  }
+
+  async function handleDismissSuggestion(oldUrl: string) {
+    await doAction("dismiss_suggestion", { oldUrl });
+    setSuggestions((prev) => prev.filter((s) => s.sourceUrl !== oldUrl));
+  }
 
   const fetchSiteAuth = useCallback(async () => {
     const res = await fetch("/api/admin/site-auth");
@@ -280,6 +327,15 @@ export default function OwnerFeedsPage() {
           >
             Unknown ({unknownCount})
           </button>
+          {filterMode === "failed" && failedCount > 0 && (
+            <button
+              onClick={handleRescanFailed}
+              disabled={rescanning || busy}
+              className="ml-auto px-3 py-1.5 rounded-lg text-xs bg-amber-600 text-white disabled:opacity-50"
+            >
+              {rescanning ? "Rescanning..." : "Rescan failed feeds"}
+            </button>
+          )}
         </div>
       )}
 
@@ -318,13 +374,58 @@ export default function OwnerFeedsPage() {
         <div className="rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800/50">
           {filtered.map((source) => {
             const status = getStatus(source.url);
+            const suggestion = suggestionsByUrl[source.url];
             return (
-              <div key={source.url} className={`flex items-center gap-4 px-4 py-3 ${source.enabled === false ? "opacity-50" : ""}`}>
-                <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${status === "ok" ? "bg-emerald-500" : status === "error" ? "bg-red-400" : "bg-gray-300 dark:bg-gray-600"}`} />
-                <button onClick={() => doAction("toggle", { url: source.url })} disabled={busy} className={`w-8 h-5 rounded-full transition-colors flex-shrink-0 ${source.enabled !== false ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600"}`}><div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${source.enabled !== false ? "translate-x-3.5" : "translate-x-0.5"}`} /></button>
-                <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{source.name}</p><p className="text-xs text-gray-400 dark:text-gray-500 truncate">{source.url}</p></div>
-                <a href={source.website} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0">Visit</a>
-                <button onClick={() => doAction("remove", { url: source.url })} disabled={busy} className="text-xs text-red-400 hover:text-red-600 transition flex-shrink-0">Remove</button>
+              <div key={source.url} className={`${source.enabled === false ? "opacity-50" : ""}`}>
+                <div className="flex items-center gap-4 px-4 py-3">
+                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${status === "ok" ? "bg-emerald-500" : status === "error" ? "bg-red-400" : "bg-gray-300 dark:bg-gray-600"}`} />
+                  <button onClick={() => doAction("toggle", { url: source.url })} disabled={busy} className={`w-8 h-5 rounded-full transition-colors flex-shrink-0 ${source.enabled !== false ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600"}`}><div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${source.enabled !== false ? "translate-x-3.5" : "translate-x-0.5"}`} /></button>
+                  <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{source.name}</p><p className="text-xs text-gray-400 dark:text-gray-500 truncate">{source.url}</p></div>
+                  <a href={source.website} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0">Visit</a>
+                  <button onClick={() => doAction("remove", { url: source.url })} disabled={busy} className="text-xs text-red-400 hover:text-red-600 transition flex-shrink-0">Remove</button>
+                </div>
+                {suggestion && (
+                  <div className="mx-4 mb-3 p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/10">
+                    {suggestion.suggestedFeedUrl && suggestion.preflightOk ? (
+                      <>
+                        <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">Suggested replacement feed (preflight passed)</p>
+                        <p className="text-xs text-gray-700 dark:text-gray-200 break-all">→ {suggestion.suggestedFeedUrl}</p>
+                        {suggestion.suggestedWebsite && (
+                          <p className="text-xs text-gray-500 break-all">website: {suggestion.suggestedWebsite}</p>
+                        )}
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => handleApproveSuggestion(source, suggestion)}
+                            disabled={busy}
+                            className="px-3 py-1 rounded-md bg-emerald-600 text-white text-xs disabled:opacity-50"
+                          >
+                            Approve & replace
+                          </button>
+                          <button
+                            onClick={() => handleDismissSuggestion(source.url)}
+                            disabled={busy}
+                            className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-xs"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          No valid replacement found{suggestion.reason ? ` (${suggestion.reason})` : ""}.
+                        </p>
+                        <button
+                          onClick={() => handleDismissSuggestion(source.url)}
+                          disabled={busy}
+                          className="px-2 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-xs"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
