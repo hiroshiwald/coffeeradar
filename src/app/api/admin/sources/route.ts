@@ -10,7 +10,7 @@ import {
 import { getInMemoryHealth } from "@/lib/sources";
 import { addOrUpdateMasterSource, listMasterSources, removeMasterSource, toggleMasterSource } from "@/lib/sourceStore";
 import { discoverFeedFromStoreUrl } from "@/lib/feedDiscovery";
-import { suggestReplacementsForFailed } from "@/lib/feedSuggestion";
+import { triageFailedFeeds, TriageResult } from "@/lib/feedTriage";
 
 export const dynamic = "force-dynamic";
 
@@ -62,22 +62,37 @@ export async function POST(request: NextRequest) {
     const all = await listMasterSources();
     const failed = all.filter((s) => health[s.url] === "error" && s.enabled !== false);
 
-    const results = await suggestReplacementsForFailed(failed);
+    const results: TriageResult[] = await triageFailedFeeds(failed);
 
     if (hasTurso()) {
       for (const r of results) {
         await upsertFeedSuggestion({
           sourceUrl: r.sourceUrl,
-          suggestedFeedUrl: r.candidate?.feedUrl ?? null,
-          suggestedWebsite: r.candidate?.website ?? null,
-          preflightOk: !!r.preflight?.ok,
-          reason: r.candidate ? r.preflight?.reason ?? "ok" : r.reason ?? "no_candidate_found",
+          suggestedFeedUrl: r.discoveredFeedUrl ?? null,
+          suggestedWebsite: r.discoveredWebsite ?? null,
+          preflightOk: r.status === "recommend_add",
+          reason:
+            r.status === "recommend_add"
+              ? "recommend_add"
+              : r.status === "recommend_deletion"
+                ? "site_dead"
+                : "manual_review",
         });
       }
     }
 
     const suggestions = hasTurso() ? await listFeedSuggestions() : [];
     return NextResponse.json({ scanned: failed.length, results, suggestions });
+  }
+
+  if (action === "delete_dead_source") {
+    const { url } = body;
+    if (!url) return NextResponse.json({ error: "url required" }, { status: 400 });
+    await removeMasterSource(url);
+    if (hasTurso()) await deleteFeedSuggestion(url);
+    const sources = await listMasterSources();
+    const suggestions = hasTurso() ? await listFeedSuggestions() : [];
+    return NextResponse.json({ sources, suggestions });
   }
 
   if (action === "approve_suggestion") {
