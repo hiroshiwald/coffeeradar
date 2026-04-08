@@ -235,3 +235,165 @@ is clean.
   `fetchAllFeeds`, assert local cache TTL).
 - Playwright e2e covering the first 5 smoke steps in `TEST_PLAN.md`.
 - Add coverage gating to CI once the above land.
+
+---
+
+## 2026-04-08 — Two-step triage for failed feeds
+
+### Scope
+Replace the old "Rescan failed feeds" behavior (which just re-ran the
+autodiscovery path from `feedDiscovery.ts` and produced a binary
+"candidate found" / "no candidate" outcome) with a richer two-step
+triage pipeline that classifies each failing source into one of three
+actionable states: `recommend_add`, `recommend_deletion`, or
+`manual_review`. Admin panel UI extended to render all three.
+
+### Spec implemented
+Per failing source:
+
+1. **Step 1 — site alive check.** GET the roaster's root URL with
+   `redirect: "follow"` and the existing `FEED_TIMEOUT_MS` (5s). A site
+   is dead on:
+   - `fetch` throwing (DNS failure, network error, timeout/abort).
+   - Status `404`, `410`, `451`.
+   - Persistent `5xx` (cron has already retried).
+   - Redirect to an unrelated registrable domain (cheap `www.`-strip +
+     lowercased host compare — PSL-correct solution deferred).
+   Status `401`/`403` is treated as "alive but gated" and falls through
+   to manual review.
+
+2. **Step 2 — feed reconstruction** (alive only). Build up to 12
+   candidate product-listing pages from:
+   - Spec-ordered static paths: `/collections/all`, `/collections/coffee`,
+     `/collections/coffees`, `/shop`, `/products`, `/store`.
+   - Anchors crawled from the root HTML whose visible text / aria-label /
+     title contains any of: `all coffees`, `coffees`, `shop`, `products`,
+     `collections`. Off-domain anchors filtered out, fragments stripped,
+     candidates deduped while preserving order.
+
+   For each candidate product page, probe feed URLs in order by
+   appending `.atom`, `.rss`, `/feed`, `/rss`, `/atom`. Each probe does
+   HEAD first (fast reject on wrong content-type), then GET. A feed is
+   accepted only when:
+   - HTTP 200 on GET.
+   - `Content-Type` header contains `xml`, `rss`, or `atom`
+     (case-insensitive substring — handles `application/atom+xml;
+     charset=utf-8`).
+   - Body parses with `fast-xml-parser` AND has ≥1 `feed.entry` (Atom),
+     `rss.channel.item` (RSS), or `rdf:RDF.item` (RDF). Handles
+     single-vs-array children.
+   Short-circuits on first valid feed.
+
+3. **Classification:**
+   - `siteAlive = false` → `recommend_deletion`.
+   - Alive + feed found → `recommend_add` with `discoveredFeedUrl` and
+     `discoveredWebsite`.
+   - Alive + no feed after all probes → `manual_review`.
+
+Deliberately does **not** call `validateFeedUrl` from `feedValidator.ts`
+— that helper additionally requires a non-merch coffee entry via
+`heuristics.ts`, which is stricter than the spec (which only requires
+≥1 entry/item). Using the stricter check would under-count feeds for
+roasters that just launched.
+
+### Files
+- `src/lib/feedTriage.ts` (new, ~370 lines) — pure module, no DB. Public
+  API: `triageFailedFeed(source)`, `triageFailedFeeds(sources, concurrency=5)`,
+  `TriageStatus`, `TriageResult`.
+- `src/lib/__tests__/feedTriage.test.ts` (new, ~270 lines) — 12 cases
+  covering all three outcomes, offsite redirect, www-redirect treated as
+  alive, 5xx, wrong content-type rejection, empty-feed rejection, anchor
+  crawl with off-domain filter, short-circuit on first hit, and a batch
+  ordering test. All green.
+- `src/app/api/admin/sources/route.ts` — `rescan_failed` now calls
+  `triageFailedFeeds` instead of `suggestReplacementsForFailed`. New
+  `delete_dead_source` action for the dead-site button (removes source
+  and deletes the suggestion atomically). Existing
+  `approve_suggestion` / `dismiss_suggestion` actions unchanged and
+  still work for `recommend_add` / `manual_review`.
+- `src/app/owner/feeds/page.tsx` — the suggestion-card block now
+  branches on `suggestion.reason`:
+  - `recommend_add` → green "Recommend add: discovered working feed"
+    card with the existing Approve & replace button.
+  - `site_dead` → red "Recommend deletion: site appears dead" card
+    with a new Delete source button (behind `window.confirm`).
+  - `manual_review` → gray "Manual review needed" card with Dismiss.
+  - Fallback → legacy amber card preserved for any pre-existing
+    `feed_suggestions` rows from the old pipeline.
+  The "Rescan failed feeds" button's status message now reads
+  `"Triaged N failed feeds: X recommend add, Y recommend deletion,
+  Z manual review."`
+- `scripts/triage-failed-feeds.ts` (new) — read-only verification
+  script. Run via `TURSO_DATABASE_URL=... npx tsx
+  scripts/triage-failed-feeds.ts [limit]` to triage up to `limit`
+  real failing sources from the DB and print a JSON table + summary
+  counts. Not run in this session (no Turso credentials in sandbox).
+
+### DB schema
+**Unchanged.** The existing `feed_suggestions` table is reused by
+mapping triage outcomes onto existing columns:
+
+| Triage status         | `suggested_feed_url` | `suggested_website` | `preflight_ok` | `reason`          |
+|-----------------------|----------------------|---------------------|----------------|-------------------|
+| `recommend_add`       | discovered URL       | discovered website  | `1`            | `recommend_add`   |
+| `recommend_deletion`  | `null`               | `null`              | `0`            | `site_dead`       |
+| `manual_review`       | `null`               | `null`              | `0`            | `manual_review`   |
+
+No migration required.
+
+### Files NOT touched (per constraints)
+- `src/lib/feedDiscovery.ts` — existing autodiscovery, frozen.
+- `src/lib/feedSuggestion.ts` — kept importable; no longer wired into
+  `rescan_failed` but tests still pass.
+- `src/lib/feedFetcher.ts`, `src/app/api/cron/route.ts` — failure-marking
+  pipeline, frozen.
+- `src/lib/db.ts` schema — no new columns.
+
+### Test status
+- Full Vitest suite: **174/176 passing**. The 2 failures
+  (`heuristics.test.ts`, `feedParser.test.ts`) are pre-existing on
+  `main` and unrelated to this feature (verified via `git stash` +
+  rerun). They concern flavor-note extraction ("Chocolate" vs
+  "Dark Chocolate") and are not touched by this change.
+- `tsc --noEmit` clean.
+- `next build` succeeds with no new warnings.
+
+### Known risks flagged during planning
+1. **5xx handling is aggressive.** Persistent 5xx at triage time is
+   classified as `recommend_deletion`. An alternative (downgrade to
+   `manual_review:transient_error`) would be more conservative but
+   produces more admin noise. Current default: the cron has already
+   retried, so a persistent 5xx is usually real.
+2. **Off-domain redirect detection is heuristic.** Any cross-
+   registrable-domain redirect (after `www.`-strip) is flagged as
+   `recommend_deletion`. False positives are possible when a roaster
+   legitimately moves to `shop.myshopify.com` or similar. A PSL-based
+   comparison + a parking-sentinel allowlist (`parking`, `sedoparking`,
+   `hugedomains`, `godaddy`) would reduce this; deferred. Admins can
+   dismiss false positives with one click.
+3. **HTTP request fan-out.** Worst case per source is ~1 (root) + 12
+   (product pages) × 5 (suffixes) × up to 2 (HEAD then GET) ≈ 90 fetches.
+   With concurrency 5 that's bursty but short-circuits on first hit. Not
+   intended for per-cron-tick invocation; admin-triggered only.
+4. **No 200KB body cap** before XML parsing. A malicious HTML-as-XML
+   response could slow the parser; mitigated in practice by the 5s
+   fetch timeout and the content-type gate.
+5. **`feed_suggestions.reason` encoding drift.** The old pipeline wrote
+   values like `"http_error"`, `"ok"`, `"no_candidate_found"`. The new
+   pipeline writes `"recommend_add"`, `"site_dead"`, `"manual_review"`.
+   The UI's fallback branch still renders any unrecognized `reason`
+   value, so mixed rows are handled gracefully during rollout.
+
+### Commit
+- `6c86e6c` — Add two-step triage for failed feeds. Branch:
+  `claude/retry-failed-feeds-zf5vP`.
+
+### Follow-ups
+- Verify against 3–5 real failing feeds via
+  `scripts/triage-failed-feeds.ts` (requires Turso credentials).
+- Consider downgrading persistent 5xx to `manual_review` if admin
+  deletion recommendations turn out to be noisy in practice.
+- Consider adding a parking-sentinel allowlist or a PSL-based
+  registrable-domain comparison (`tldts` dep) to reduce off-domain
+  redirect false positives.
+- Optional: cap XML parser input at 200KB as defense-in-depth.
