@@ -33,6 +33,7 @@ function maybeAbsolute(base: string, link: string): string {
 async function fetchText(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
+      cache: "no-store",
       headers: {
         "User-Agent": "CoffeeRadar/1.0",
         Accept: "text/html,application/xml,application/atom+xml,application/rss+xml,text/xml",

@@ -20,6 +20,7 @@ async function fetchOne(source: FetchTarget): Promise<{ entries: CoffeeEntry[]; 
     const timer = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS);
     const res = await fetch(source.url, {
       signal: controller.signal,
+      cache: "no-store",
       headers: { "User-Agent": "CoffeeRadar/1.0", Accept: "application/atom+xml, application/rss+xml, application/xml, text/xml" },
     });
     clearTimeout(timer);
