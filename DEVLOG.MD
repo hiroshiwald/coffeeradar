@@ -458,3 +458,35 @@ making it an effective "last seen in feed" timestamp.
 - The `CoffeeEntry` type is unchanged.
 - Front-end sorting by date still uses the publication date.
 - No schema migration needed.
+
+---
+
+## 2026-04-09 — Fix stale RSS content from Next.js Data Cache
+
+### Bug
+The cron job reported 816 items "inserted" but no Apr 9 coffees
+appeared — all entries were dated Apr 8 or older. The feed fetcher
+was re-upserting stale cached XML on every run, not fresh feed
+content.
+
+### Root cause
+Next.js 14 extends the global `fetch()` with aggressive caching by
+default (the "Data Cache"). Every `fetch()` call in a server context
+is cached indefinitely unless opted out. The `fetch()` calls in the
+feed pipeline lacked a `cache` directive, so Next.js served cached
+responses for every RSS/Atom feed URL. The 816 "insertions" were
+`INSERT OR REPLACE` re-upserts of identical stale XML, producing no
+new coffees.
+
+### Fix
+Added `cache: "no-store"` to every `fetch()` call that retrieves
+external RSS/Atom feed or web content:
+
+1. **`src/lib/feedFetcher.ts`** — `fetchOne()`: the primary feed
+   fetch path used by cron and manual refresh.
+2. **`src/lib/feedTriage.ts`** — `safeFetch()`: used by the two-step
+   triage pipeline (site alive check + feed probing).
+3. **`src/lib/feedValidator.ts`** — `fetchWithTimeout()`: used by
+   feed validation during suggestion approval.
+4. **`src/lib/feedDiscovery.ts`** — `fetchText()`: used by feed
+   auto-discovery when adding a source by store URL.

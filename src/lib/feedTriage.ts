@@ -80,6 +80,7 @@ async function safeFetch(url: string, method: "GET" | "HEAD" = "GET"): Promise<F
       headers: DEFAULT_HEADERS,
       redirect: "follow",
       signal: controller.signal,
+      cache: "no-store",
     });
     clearTimeout(timer);
     return { response: res, threw: false };
