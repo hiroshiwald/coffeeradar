@@ -93,7 +93,7 @@ describe("fetchAllFeeds", () => {
     expect(result.coffees).toHaveLength(1);
   });
 
-  it("filters out entries older than 30 days", async () => {
+  it("includes entries with old publication dates", async () => {
     const sources = [
       { name: "Old Roaster", url: "https://old.com/feed", website: "https://old.com" },
     ];
@@ -105,8 +105,8 @@ describe("fetchAllFeeds", () => {
     });
 
     const result = await fetchAllFeeds();
-    expect(result.coffees).toHaveLength(0);
-    expect(result.healthy).toBe(1); // Feed was healthy, entries were just old
+    expect(result.coffees).toHaveLength(1);
+    expect(result.healthy).toBe(1);
   });
 
   it("handles empty source list", async () => {

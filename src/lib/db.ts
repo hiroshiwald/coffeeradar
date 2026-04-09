@@ -36,6 +36,7 @@ export async function initDb(): Promise<void> {
       created_at TEXT DEFAULT (datetime('now'))
     )`,
     `CREATE INDEX IF NOT EXISTS idx_coffees_date ON coffees(date)`,
+    `CREATE INDEX IF NOT EXISTS idx_coffees_created_at ON coffees(created_at)`,
     `CREATE INDEX IF NOT EXISTS idx_coffees_type ON coffees(type)`,
     `CREATE INDEX IF NOT EXISTS idx_coffees_is_merch ON coffees(is_merch)`,
     `CREATE INDEX IF NOT EXISTS idx_coffees_identity ON coffees(roaster, coffee, link, date)`,
@@ -191,7 +192,7 @@ export async function getCoffees(): Promise<CoffeeEntry[]> {
   const db = getClient();
   if (!db) return [];
   const result = await db.execute(
-    `SELECT * FROM coffees WHERE date >= datetime('now', '-30 days') ORDER BY date DESC`
+    `SELECT * FROM coffees WHERE created_at >= datetime('now', '-30 days') ORDER BY created_at DESC`
   );
   return result.rows.map((row) => ({
     id: String(row.id),
@@ -234,7 +235,7 @@ export async function getFeedHealth(): Promise<{ healthy: number; failed: number
 export async function cleanOldEntries(): Promise<number> {
   const db = getClient();
   if (!db) return 0;
-  const result = await db.execute(`DELETE FROM coffees WHERE date < datetime('now', '-30 days')`);
+  const result = await db.execute(`DELETE FROM coffees WHERE created_at < datetime('now', '-30 days')`);
   return result.rowsAffected;
 }
 

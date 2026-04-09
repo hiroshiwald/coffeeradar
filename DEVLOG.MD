@@ -397,3 +397,64 @@ No migration required.
   registrable-domain comparison (`tldts` dep) to reduce off-domain
   redirect false positives.
 - Optional: cap XML parser input at 200KB as defense-in-depth.
+
+---
+
+## 2026-04-09 — Fix coffees excluded from /api/coffees response
+
+### Bug
+Valid coffees present in the Turso `coffees` table were excluded from
+the `/api/coffees` API response (696 shown vs. more in DB). Example:
+Dayglow "Pastel Hour" ($33, Washed) existed in the database but was
+not displayed on the site.
+
+### Root cause
+The `date` column in the `coffees` table stores the RSS/Atom
+**publication date** — the date the product was first added to the
+store, which can be months old for long-running listings. Three layers
+of 30-day filtering used this column:
+
+1. `getCoffees()` in `src/lib/db.ts`: SQL `WHERE date >= datetime('now',
+   '-30 days')` — lexicographic string comparison against publication
+   dates, which fails for non-ISO formats and excludes valid old listings.
+2. `cleanOldEntries()` in `src/lib/db.ts`: `DELETE FROM coffees WHERE
+   date < datetime('now', '-30 days')` — same issue.
+3. `fetchAllFeeds()` in `src/lib/feedFetcher.ts`: application-level
+   filter that rejected entries with parseable dates >30 days old but
+   inconsistently passed entries with unparseable dates (`!d`/NaN
+   check).
+
+After PRs #29–#30 introduced feed source triage (enable/disable
+sources), disabled sources stopped being re-fetched. Their coffees
+were never re-upserted, so `created_at` was never refreshed, and the
+coffees aged out of the 30-day window.
+
+**No JOINs** against `feed_health`, `feed_sources`, or
+`feed_suggestions` existed — the initial hypothesis was incorrect.
+
+### Fix
+Switched the retention/visibility filter from `date` (publication
+date) to `created_at` (ingestion/last-seen timestamp). The
+`created_at` column already existed on the `coffees` table with
+`DEFAULT (datetime('now'))` and is reset on every `INSERT OR REPLACE`,
+making it an effective "last seen in feed" timestamp.
+
+1. **`src/lib/db.ts` — `getCoffees()`**: changed filter and sort from
+   `date` to `created_at`.
+2. **`src/lib/db.ts` — `cleanOldEntries()`**: changed deletion filter
+   from `date` to `created_at`.
+3. **`src/lib/db.ts` — `initDb()`**: added
+   `idx_coffees_created_at` index.
+4. **`src/lib/feedFetcher.ts`**: removed the 30-day application-level
+   date filter entirely. Feeds naturally limit their output; the DB
+   layer handles retention via `created_at`.
+5. **`src/lib/constants.ts`**: removed unused `THIRTY_DAYS_MS`.
+6. **`src/lib/__tests__/feedFetcher.test.ts`**: updated test — entries
+   with old publication dates are now included.
+
+### What did NOT change
+- The `date` field still stores the publication date (used for display
+  and stable ID generation via `buildStableId()`).
+- The `CoffeeEntry` type is unchanged.
+- Front-end sorting by date still uses the publication date.
+- No schema migration needed.
