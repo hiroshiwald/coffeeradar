@@ -490,3 +490,43 @@ external RSS/Atom feed or web content:
    feed validation during suggestion approval.
 4. **`src/lib/feedDiscovery.ts`** — `fetchText()`: used by feed
    auto-discovery when adding a source by store URL.
+
+---
+
+## 2026-04-09 — Fix INSERT OR REPLACE resetting created_at on cron upsert
+
+### Bug
+Coffee count inflated to 3,142. The 30-day cleanup
+(`cleanOldEntries`) never removed rows, and `getCoffees()` returned
+every coffee ever scraped instead of only those first seen within the
+last 30 days.
+
+### Root cause
+`upsertCoffees()` used `INSERT OR REPLACE`, which internally deletes
+the existing row and inserts a new one. Because `created_at` has
+`DEFAULT (datetime('now'))` and was not in the upsert column list, it
+was reset to "now" on every cron run. This turned `created_at` into a
+"last seen" timestamp rather than "first seen," so nothing ever aged
+past the 30-day window.
+
+### Fix
+Changed the SQL in `upsertCoffees()` from `INSERT OR REPLACE` to
+`INSERT ... ON CONFLICT(id) DO UPDATE SET ...` with an explicit
+`created_at = coffees.created_at` clause:
+
+1. **`src/lib/db.ts` — `upsertCoffees()`**: replaced
+   `INSERT OR REPLACE` with `INSERT ... ON CONFLICT(id) DO UPDATE SET`
+   listing all mutable columns and preserving `created_at` via
+   `created_at = coffees.created_at`.
+
+For new rows, `DEFAULT (datetime('now'))` still applies, giving a true
+"first seen" date. No schema migration needed.
+
+### What did NOT change
+- The `chunkedBatchInsert` helper is unchanged — it accepts any SQL
+  string.
+- The `toArgs` callback produces the same 11 values in the same order.
+- No schema migration needed — `id TEXT PRIMARY KEY` is already the
+  conflict target.
+- Display and cleanup queries (already using `created_at`) work
+  correctly now that existing rows keep their original timestamp.
