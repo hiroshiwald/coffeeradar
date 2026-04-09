@@ -169,8 +169,20 @@ export async function upsertCoffees(entries: CoffeeEntry[]): Promise<void> {
   if (!db || entries.length === 0) return;
   await chunkedBatchInsert(
     db,
-    `INSERT OR REPLACE INTO coffees (id, roaster, coffee, type, process, tasting_notes, price, date, link, image_url, is_merch)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO coffees (id, roaster, coffee, type, process, tasting_notes, price, date, link, image_url, is_merch)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       roaster = excluded.roaster,
+       coffee = excluded.coffee,
+       type = excluded.type,
+       process = excluded.process,
+       tasting_notes = excluded.tasting_notes,
+       price = excluded.price,
+       date = excluded.date,
+       link = excluded.link,
+       image_url = excluded.image_url,
+       is_merch = excluded.is_merch,
+       created_at = coffees.created_at`,
     entries,
     (e) => [
       e.id,
