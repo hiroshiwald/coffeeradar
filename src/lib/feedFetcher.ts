@@ -1,7 +1,7 @@
 import { CoffeeEntry } from "./types";
 import { parseFeed } from "./feedParser";
 import { listEnabledMasterSources } from "./sourceStore";
-import { FEED_CONCURRENCY, FEED_TIMEOUT_MS, THIRTY_DAYS_MS } from "./constants";
+import { FEED_CONCURRENCY, FEED_TIMEOUT_MS } from "./constants";
 
 export interface FeedResult {
   url: string;
@@ -62,14 +62,8 @@ export async function fetchAllFeeds(): Promise<{
     }
   }
 
-  const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS;
-  const recent = allEntries.filter((e) => {
-    const d = new Date(e.date).getTime();
-    return !d || d > thirtyDaysAgo;
-  });
-
   const deduped = new Map<string, CoffeeEntry>();
-  for (const entry of recent) {
+  for (const entry of allEntries) {
     const existing = deduped.get(entry.id);
     if (!existing) {
       deduped.set(entry.id, entry);
