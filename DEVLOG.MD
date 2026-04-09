@@ -530,3 +530,27 @@ For new rows, `DEFAULT (datetime('now'))` still applies, giving a true
   conflict target.
 - Display and cleanup queries (already using `created_at`) work
   correctly now that existing rows keep their original timestamp.
+
+---
+
+## 2026-04-09 — Refine upsert clause and remove misplaced cleanOldData call
+
+### Changes
+
+1. **`src/lib/db.ts` — `upsertCoffees()`**: removed the explicit
+   `created_at = coffees.created_at` line from the `ON CONFLICT ... DO
+   UPDATE SET` clause. In SQLite, omitting a column from the UPDATE SET
+   leaves the existing value untouched — the effect is identical but the
+   SQL is cleaner.
+
+2. **`src/app/api/coffees/route.ts`**: removed the `await cleanOldData()`
+   call from the `forceRefresh` branch and removed `cleanOldData` from
+   the import. Destructive cleanup must not execute on read/refresh
+   endpoints. The call already exists in `src/app/api/cron/route.ts`
+   (line 22), which is the sole correct location.
+
+### What did NOT change
+- `src/app/api/cron/route.ts` is untouched — it already calls
+  `cleanOldData()` and remains the only place for cleanup.
+- No schema or behavior change — both edits preserve identical runtime
+  semantics while improving code hygiene.

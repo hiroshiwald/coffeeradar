@@ -181,8 +181,7 @@ export async function upsertCoffees(entries: CoffeeEntry[]): Promise<void> {
        date = excluded.date,
        link = excluded.link,
        image_url = excluded.image_url,
-       is_merch = excluded.is_merch,
-       created_at = coffees.created_at`,
+       is_merch = excluded.is_merch`,
     entries,
     (e) => [
       e.id,
