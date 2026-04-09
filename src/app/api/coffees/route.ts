@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hasTurso, initDb, getCoffees, getFeedHealth, upsertCoffees, saveFeedHealth, cleanOldData } from "@/lib/db";
+import { hasTurso, initDb, getCoffees, getFeedHealth, upsertCoffees, saveFeedHealth } from "@/lib/db";
 import { fetchAllFeeds } from "@/lib/feedFetcher";
 import { FALLBACK_COFFEES } from "@/lib/fallback";
 import { ApiResponse } from "@/lib/types";
@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
       if (coffees.length > 0) {
         await upsertCoffees(coffees);
         await saveFeedHealth(healthy, failed, total);
-        await cleanOldData();
       }
       const response: ApiResponse = {
         coffees: coffees.length > 0 ? coffees : FALLBACK_COFFEES,
