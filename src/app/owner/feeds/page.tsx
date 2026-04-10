@@ -36,6 +36,7 @@ export default function OwnerFeedsPage() {
   // Site access control state
   const [suggestions, setSuggestions] = useState<FeedSuggestion[]>([]);
   const [rescanning, setRescanning] = useState(false);
+  const [cronRunning, setCronRunning] = useState(false);
   const [siteUsers, setSiteUsers] = useState<SiteUserInfo[]>([]);
   const [protectionEnabled, setProtectionEnabled] = useState(false);
   const [newUsername, setNewUsername] = useState("");
@@ -77,6 +78,20 @@ export default function OwnerFeedsPage() {
       setStatusMessage(data.error ?? "Rescan failed.");
     }
     setRescanning(false);
+  }
+
+  async function handleRunCron() {
+    setCronRunning(true);
+    setStatusMessage("Running cron job...");
+    const res = await fetch("/api/cron");
+    const data = await res.json();
+    if (res.ok) {
+      setStatusMessage(`Cron done: ${data.inserted} coffees inserted, ${data.healthy}/${data.total} feeds healthy.`);
+      fetchSources();
+    } else {
+      setStatusMessage(data.error ?? "Cron failed.");
+    }
+    setCronRunning(false);
   }
 
   async function handleApproveSuggestion(source: FeedSource, suggestion: FeedSuggestion) {
@@ -218,6 +233,13 @@ export default function OwnerFeedsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={handleRunCron}
+            disabled={cronRunning || busy}
+            className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50"
+          >
+            {cronRunning ? "Running..." : "Run Cron"}
+          </button>
           <button
             onClick={handleExportCsv}
             className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition"
