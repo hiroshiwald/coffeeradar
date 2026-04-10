@@ -203,7 +203,7 @@ export async function getCoffees(): Promise<CoffeeEntry[]> {
   const db = getClient();
   if (!db) return [];
   const result = await db.execute(
-    `SELECT * FROM coffees WHERE created_at >= datetime('now', '-30 days') ORDER BY created_at DESC`
+    `SELECT * FROM coffees WHERE created_at >= datetime('now', '-30 days') AND date >= datetime('now', '-30 days') ORDER BY created_at DESC`
   );
   return result.rows.map((row) => ({
     id: String(row.id),
@@ -246,7 +246,9 @@ export async function getFeedHealth(): Promise<{ healthy: number; failed: number
 export async function cleanOldEntries(): Promise<number> {
   const db = getClient();
   if (!db) return 0;
-  const result = await db.execute(`DELETE FROM coffees WHERE created_at < datetime('now', '-30 days')`);
+  const result = await db.execute(
+    `DELETE FROM coffees WHERE created_at < datetime('now', '-30 days') OR date < datetime('now', '-30 days')`
+  );
   return result.rowsAffected;
 }
 

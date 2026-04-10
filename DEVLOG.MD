@@ -554,3 +554,90 @@ For new rows, `DEFAULT (datetime('now'))` still applies, giving a true
   `cleanOldData()` and remains the only place for cleanup.
 - No schema or behavior change — both edits preserve identical runtime
   semantics while improving code hygiene.
+
+---
+
+## 2026-04-10 — Investigation and fix: coffee count inflated to 3,147
+
+### Problem
+After PRs #31–#35 (four successive fixes), the coffee count inflated from
+~692 to ~3,147 and was unstable across page refreshes. Each PR fixed a
+real issue but the compound effect made things worse.
+
+### Investigation findings
+
+**Database state (inferred from code):** All `created_at` values in the
+`coffees` table were reset to ~2026-04-09 by the old `INSERT OR REPLACE`
+(which deletes-then-inserts, resetting `DEFAULT (datetime('now'))`).
+PR #33 fixed the upsert to `ON CONFLICT DO UPDATE SET` (preserving
+`created_at`), but the damage was already done — every row now has a
+recent `created_at`, so:
+- `getCoffees()` returns all ~3,147 rows (nothing excluded by 30-day
+  `created_at` filter)
+- `cleanOldEntries()` deletes nothing (all `created_at` within 30 days)
+
+**Instability root cause:** Two code paths returned different data:
+1. **Normal page load** (`GET /api/coffees`): called `getCoffees()` →
+   DB-filtered result (~3,147 rows with corrupted `created_at`)
+2. **Force refresh** (`GET /api/coffees?refresh=true`): called
+   `fetchAllFeeds()` then returned the **raw fetch result** directly —
+   NOT the DB-filtered `getCoffees()`. The raw result varies per
+   request depending on which feeds succeed/timeout, causing a
+   different count on every refresh.
+
+**Re-accumulation risk:** Even after a one-time DELETE of old rows,
+the cron would re-fetch old-publication-date entries from feeds and
+re-insert them with `created_at = now()`. Without a `date`-based
+filter, old listings would accumulate again within one cron cycle.
+
+### Fix (three parts)
+
+**Part A — Stable refresh response** (`src/app/api/coffees/route.ts`):
+Changed the `forceRefresh` branch to call `getCoffees()` after
+upserting instead of returning the raw feed result. Both code paths
+now return identically filtered DB data → stable count.
+
+**Part B — Date-based cleanup and filtering** (`src/lib/db.ts`):
+1. `cleanOldEntries()`: changed from
+   `WHERE created_at < datetime('now', '-30 days')` to
+   `WHERE created_at < ... OR date < datetime('now', '-30 days')`.
+   On the next cron run this deletes all rows with old publication
+   dates (the one-time cleanup) AND prevents re-accumulation going
+   forward.
+2. `getCoffees()`: added `AND date >= datetime('now', '-30 days')` to
+   the WHERE clause so old-publication-date entries are never shown,
+   even between cron runs.
+
+**Part C — Verification:** After deployment, trigger the cron from the
+Vercel dashboard. `cleanOldEntries()` will delete rows with
+`date < 30 days`, bringing the count to ~700. Subsequent cron runs
+will re-fetch old-date entries from feeds (upserted into DB) but
+`cleanOldEntries()` immediately removes them, and `getCoffees()`
+never returns them.
+
+### Files changed
+- `src/app/api/coffees/route.ts` — forceRefresh reads back via
+  `getCoffees()` after upsert
+- `src/lib/db.ts` — `getCoffees()` adds `date` filter;
+  `cleanOldEntries()` adds `date`-based DELETE
+
+### What did NOT change
+- `src/app/api/cron/route.ts` — unchanged, still the sole location
+  for `cleanOldData()`
+- `upsertCoffees()` — unchanged, `ON CONFLICT DO UPDATE SET` still
+  correctly preserves `created_at`
+- Schema — no migration needed
+
+### Key lessons
+- **Read the actual code, not just descriptions of what previous fixes
+  did.** The DEVLOG described the upsert fix correctly but didn't
+  mention the forceRefresh path returning raw data.
+- **Trace both code paths for any endpoint.** The normal and refresh
+  paths in `/api/coffees` returned different datasets — a classic
+  source of instability.
+- **One-time cleanups don't work when a recurring process re-creates
+  the data.** The cron re-fetches old-date entries on every run, so
+  cleanup must be permanent, not one-shot.
+- **Destructive operations (DELETE) must only run in the cron handler,
+  never on read requests.** This was already fixed in PR #34 and
+  remains correct.
