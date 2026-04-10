@@ -24,13 +24,15 @@ export async function GET(request: NextRequest) {
   try {
     await initDb();
 
-    // Manual refresh: fetch feeds, write to DB, return fresh data
+    // Manual refresh: fetch feeds, write to DB, then read back from DB
+    // so the response is filtered identically to the normal read path.
     if (forceRefresh) {
-      const { coffees, healthy, failed, total } = await fetchAllFeeds();
-      if (coffees.length > 0) {
-        await upsertCoffees(coffees);
+      const { coffees: fetched, healthy, failed, total } = await fetchAllFeeds();
+      if (fetched.length > 0) {
+        await upsertCoffees(fetched);
         await saveFeedHealth(healthy, failed, total);
       }
+      const coffees = await getCoffees();
       const response: ApiResponse = {
         coffees: coffees.length > 0 ? coffees : FALLBACK_COFFEES,
         meta: {
