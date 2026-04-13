@@ -795,3 +795,9 @@ never returns them.
 - Entries with unparseable dates are also excluded
 - Prevents stale entries from being stored in DB or returned on the non-DB path
 - DB-side filter in `getCoffees()` kept as defense-in-depth
+
+### 2026-04-13 — Fix: normalize feed dates to ISO and clean non-ISO entries from DB
+- **Root cause**: RSS dates stored as raw RFC 822 strings; SQLite string comparison against ISO `datetime()` output let all old entries pass the 30-day filter
+- **Changed**: `src/lib/feedParser.ts` — both `parseAtomFeed()` and `parseRssFeed()` now convert `publishedAt` to ISO via `new Date().toISOString()` before setting the `date` field; `buildStableId` still uses raw string for ID stability
+- **Changed**: `src/lib/db.ts` — `cleanOldEntries()` DELETE now includes `OR date NOT LIKE '20__-%'` to catch any legacy non-ISO dates on next cron run
+- No schema changes, no new dependencies

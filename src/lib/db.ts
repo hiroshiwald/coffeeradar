@@ -267,7 +267,7 @@ export async function cleanOldEntries(): Promise<number> {
   const db = getClient();
   if (!db) return 0;
   const result = await db.execute(
-    `DELETE FROM coffees WHERE created_at < datetime('now', '-30 days') OR date < datetime('now', '-30 days')`
+    `DELETE FROM coffees WHERE created_at < datetime('now', '-30 days') OR date < datetime('now', '-30 days') OR date NOT LIKE '20__-%'`
   );
   return result.rowsAffected;
 }

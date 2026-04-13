@@ -65,6 +65,8 @@ export function parseAtomFeed(xml: string, roaster: string, website: string): Co
       const price = extractShopifyPrice(e, allText, extractPrice);
       const link = resolveAtomLink(e.link, website);
       const publishedAt = String(e.published ?? e.updated ?? "");
+      const parsedDate = new Date(publishedAt);
+      const isoDate = isNaN(parsedDate.getTime()) ? "" : parsedDate.toISOString();
       const stableId = buildStableId(roaster, link, publishedAt, title || String(i));
 
       return {
@@ -75,7 +77,7 @@ export function parseAtomFeed(xml: string, roaster: string, website: string): Co
         process: detectProcess(allText),
         tastingNotes: extractNotes(allText, shopifyTags),
         price,
-        date: publishedAt,
+        date: isoDate,
         link,
         imageUrl: extractImage(e),
         isMerch: isMerchandise(title, productType, shopifyTags),
@@ -108,6 +110,8 @@ export function parseRssFeed(xml: string, roaster: string, website: string): Cof
       }
 
       const publishedAt = String(item.pubDate ?? "");
+      const parsedDate = new Date(publishedAt);
+      const isoDate = isNaN(parsedDate.getTime()) ? "" : parsedDate.toISOString();
       const link = String(item.link ?? website);
       const stableId = buildStableId(roaster, link, publishedAt, title || String(i));
 
@@ -119,7 +123,7 @@ export function parseRssFeed(xml: string, roaster: string, website: string): Cof
         process: detectProcess(allText),
         tastingNotes: extractNotes(allText, []),
         price: extractPrice(allText),
-        date: publishedAt,
+        date: isoDate,
         link,
         imageUrl,
         isMerch: isMerchandise(title, "", []),
