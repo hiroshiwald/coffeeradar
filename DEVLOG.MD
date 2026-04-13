@@ -1,5 +1,14 @@
 # DEVLOG
 
+## 2026-04-13 — Return cached data immediately on manual refresh, fetch in background
+
+- **Changed**: `src/app/api/coffees/route.ts` — forceRefresh now returns stale DB/cache data instantly and runs `fetchAllFeeds()` in background via `waitUntil` (falls back to fire-and-forget in local dev). Both `handleWithDb` and `handleWithoutDb` updated.
+- **Changed**: `src/hooks/useCoffeeData.ts` — detects `meta.backgroundRefresh`, auto-refetches after 12s, exposes `isBackgroundRefreshing` state.
+- **Changed**: `src/components/coffee-table/CoffeeTableFilters.tsx` — shows "Updating feeds…" indicator and disables refresh button during background refresh.
+- **Changed**: `src/lib/types.ts` — added `backgroundRefresh?: boolean` to `ApiResponse.meta`.
+- **Added**: `@vercel/functions` dependency for `waitUntil`.
+- **Gotcha**: `handleWithoutDb` with `forceRefresh && !localCache` (first load) still does synchronous fetch — nothing stale to serve.
+
 ## 2026-04-01 — Planning pass for admin hardening and feed-master workflow
 
 ### User request summary

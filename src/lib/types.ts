@@ -34,6 +34,7 @@ export interface ApiResponse {
     total: number;
     lastRefresh: string;
     isFallback: boolean;
+    backgroundRefresh?: boolean;
   };
 }
 
