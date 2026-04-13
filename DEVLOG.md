@@ -71,3 +71,10 @@
 - Refactored `probeForWorkingFeed` in `src/lib/feedTriage.ts` from 55 to 43 lines (AUDIT-2.md #5)
 - Extracted `buildAliveDiagnostics` helper — deduplicates identical 6-line diagnostics object in both return paths
 - No export, interface, or caller changes; all 12 feedTriage tests pass unchanged
+
+### 2026-04-13
+- Audit cycle 3: confirmed all 5 AUDIT-2.md fixes resolved; ran fresh full-codebase scan
+- Created AUDIT-3.md with 5 new top violations: uncaught `request.json()` in 3 routes, `fetchAllFeeds` 54-line triple-duty function, `middleware` 59 lines, `fetchOne` silent catch, async hooks lacking error handling
+- 3 pre-existing (carried from prior notable mentions), 1 pre-existing (newly flagged middleware), 1 introduced during AUDIT.md Fix #1
+- MANIFEST.md verified — no structural changes from AUDIT-2 fixes (all were internal refactorings with no export, file, or interface changes)
+- Gotcha: `fetchAllFeeds` and `fetchOne` catch have been in Notable Mentions for two audit cycles without being fixed; promoted to top 5 this cycle
