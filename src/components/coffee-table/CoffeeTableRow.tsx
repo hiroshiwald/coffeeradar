@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { CoffeeEntry } from "@/lib/types";
 import { formatDate } from "@/lib/formatters";
 import { getNoteColor } from "@/lib/noteColors";
@@ -9,7 +10,7 @@ interface Props {
   onSelectNote: (note: string) => void;
 }
 
-export default function CoffeeTableRow({ coffee: c, onSelectNote }: Props) {
+function CoffeeTableRow({ coffee: c, onSelectNote }: Props) {
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors">
       <td className="px-4 py-2">
@@ -83,3 +84,5 @@ export default function CoffeeTableRow({ coffee: c, onSelectNote }: Props) {
     </tr>
   );
 }
+
+export default memo(CoffeeTableRow);

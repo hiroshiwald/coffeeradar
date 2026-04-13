@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { CoffeeEntry } from "@/lib/types";
 import { getNoteColor } from "@/lib/noteColors";
 import { timeAgo } from "@/lib/formatters";
@@ -25,6 +26,8 @@ export default function CoffeeTable() {
     setShowMerch,
     toggleSort,
   } = useCoffeeFilters(data?.coffees);
+
+  const onSelectNote = useCallback((note: string) => setFilterNote(note), [setFilterNote]);
 
   const meta = data?.meta;
   const merchCount = data ? data.coffees.filter((c) => c.isMerch).length : 0;
@@ -112,7 +115,7 @@ export default function CoffeeTable() {
               </tr>
             ) : (
               filtered.map((c: CoffeeEntry) => (
-                <CoffeeTableRow key={c.id} coffee={c} onSelectNote={setFilterNote} />
+                <CoffeeTableRow key={c.id} coffee={c} onSelectNote={onSelectNote} />
               ))
             )}
           </tbody>
