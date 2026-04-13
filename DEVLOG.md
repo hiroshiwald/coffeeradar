@@ -114,3 +114,8 @@
 - `src/components/CoffeeTable.tsx`: added `useCallback` around `setFilterNote` passed as `onSelectNote`
 - Prevents unnecessary re-renders of all 300+ rows on every filter/sort state change
 - Note: `setFilterNote` is a `useState` setter (already stable), so `useCallback` is belt-and-suspenders here
+
+### 2026-04-13
+- Added `content-visibility: auto` and removed `transition-colors` from `<tr>` in `src/components/coffee-table/CoffeeTableRow.tsx`
+- Browser now skips layout/paint for off-screen rows; CSS transition state tracking eliminated across 300+ elements
+- No structural, prop, or logic changes — purely CSS-level performance fix
