@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ApiResponse } from "@/lib/types";
+import { logger } from "@/lib/logger";
 
 export function useCoffeeData() {
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -18,8 +19,8 @@ export function useCoffeeData() {
       }
       const json: ApiResponse = await res.json();
       setData(json);
-    } catch {
-      // keep existing data
+    } catch (err) {
+      logger.warn("[useCoffeeData] fetch failed, keeping existing data", err);
     } finally {
       setLoading(false);
     }
