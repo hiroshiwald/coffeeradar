@@ -5,8 +5,8 @@
 | `src/lib/types.ts` | Shared TypeScript interfaces for the entire app | `FeedSource`, `CoffeeEntry`, `SiteUser`, `ApiResponse` |
 | `src/lib/constants.ts` | Global configuration constants | `FEED_CONCURRENCY` (25), `FEED_TIMEOUT_MS` (5000) |
 | `src/lib/db.ts` | Turso (libSQL) persistence layer — schema, queries, migrations | `hasTurso()`, `initDb()`, `getCoffees()`, `getFeedHealth()`, `getFeedSources()`, `upsertCoffees()`, `saveFeedHealth()`, `saveFeedResults()`, `cleanOldData()`, `upsertFeedSource()`, `removeFeedSource()`, `toggleFeedSource()`, `upsertFeedSuggestion()`, `listFeedSuggestions()`, `deleteFeedSuggestion()`, `dbGetSiteUsers()`, `dbGetSiteUserByUsername()`, `dbAddSiteUser()`, `dbRemoveSiteUser()`, `chunkedBatchInsert()` |
-| `src/lib/sources.ts` | In-memory fallback source storage for dev without Turso | `getSources()`, `addSource()`, `updateSource()`, `removeSource()`, `toggleSource()`, `setInMemoryHealth()`, `getInMemoryHealth()` |
-| `src/lib/sourceStore.ts` | Storage abstraction — delegates to DB or in-memory based on Turso availability | `listMasterSources()`, `listEnabledMasterSources()`, `addOrUpdateMasterSource()`, `removeMasterSource()`, `toggleMasterSource()` |
+| `src/lib/sources.ts` | In-memory store factory for dev without Turso — no exported mutable state | `createInMemoryStore()`, `InMemoryStore` |
+| `src/lib/sourceStore.ts` | Storage abstraction — delegates to DB or in-memory based on Turso availability | `listMasterSources()`, `listEnabledMasterSources()`, `addOrUpdateMasterSource()`, `removeMasterSource()`, `toggleMasterSource()`, `getSourceHealth()`, `setSourceHealth()` |
 | `src/lib/siteAuth.ts` | File-based user store fallback (reads/writes `data/local-auth.json`) | `memGetSiteUsers()`, `memGetSiteUserByUsername()`, `memAddSiteUser()`, `memRemoveSiteUser()` |
 | `src/lib/siteAuthStore.ts` | Auth storage abstraction — delegates to DB or file-based store | `hasPersistentSiteAuthStore()`, `listSiteUsers()`, `addSiteUser()`, `removeSiteUser()`, `validateSiteUser()` |
 | `src/lib/authGuard.ts` | Auth validation for server components and API routes | `checkSiteAuth()`, `checkSiteAuthFromRequest()` |

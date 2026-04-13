@@ -4,6 +4,7 @@ import { fetchAllFeeds } from "@/lib/feedFetcher";
 import { FALLBACK_COFFEES } from "@/lib/fallback";
 import { ApiResponse } from "@/lib/types";
 import { checkSiteAuthFromRequest } from "@/lib/authGuard";
+import { setSourceHealth } from "@/lib/sourceStore";
 import { logger } from "@/lib/logger";
 
 export const maxDuration = 60;
@@ -96,10 +97,9 @@ async function handleWithoutDb(forceRefresh: boolean): Promise<NextResponse> {
   }
   try {
     const { coffees, healthy, failed, total, feedResults } = await fetchAllFeeds();
-    const { setInMemoryHealth } = await import("@/lib/sources");
     const healthMap: Record<string, string> = {};
     for (const r of feedResults) healthMap[r.url] = r.status;
-    setInMemoryHealth(healthMap);
+    await setSourceHealth(healthMap);
     const response: ApiResponse = {
       coffees: coffees.length > 0 ? coffees : FALLBACK_COFFEES,
       meta: { healthy, failed, total, lastRefresh: new Date().toISOString(), isFallback: coffees.length === 0 },
