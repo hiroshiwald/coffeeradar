@@ -85,3 +85,10 @@
 - `src/app/api/admin/site-auth/route.ts`: same fix
 - `src/app/api/admin/sources/route.ts`: same fix
 - No other logic changed; existing validation after parse is untouched
+
+### 2026-04-13
+- Added error handling to 3 async owner-panel hooks (AUDIT-3.md Violation #5)
+- `src/components/owner-feeds/useOwnerAuth.ts`: wrapped `fetchSiteAuth` body in try/catch, errors logged via `console.error`
+- `src/components/owner-feeds/useOwnerSources.ts`: wrapped `fetchSources` body in try/catch with `finally` for `setLoading(false)`, errors logged via `console.error`
+- `src/components/owner-feeds/useOwnerCron.ts`: added `.catch()` to fire-and-forget `fetchSources()` call with detach comment
+- No public API changes; network errors now log to console and fail gracefully to default state instead of crashing component tree

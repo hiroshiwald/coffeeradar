@@ -9,12 +9,17 @@ export function useOwnerSources() {
 
   const fetchSources = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/admin/sources");
-    const data = await res.json();
-    setSources(data.sources ?? []);
-    if (data.health) setHealth(data.health);
-    if (data.suggestions) setSuggestions(data.suggestions);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/admin/sources");
+      const data = await res.json();
+      setSources(data.sources ?? []);
+      if (data.health) setHealth(data.health);
+      if (data.suggestions) setSuggestions(data.suggestions);
+    } catch (err) {
+      console.error("Failed to fetch sources:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
