@@ -13,7 +13,7 @@
 | `src/lib/authGuard.ts` | Auth validation for server components and API routes | `checkSiteAuth()`, `checkSiteAuthFromRequest()` |
 | `src/lib/session.ts` | HMAC-SHA-256 cookie session management (7-day expiry) | `createSessionCookie()`, `validateSessionCookie()`, `clearSessionCookie()`, `getSessionCookieName()` |
 | `src/lib/crypto.ts` | Password hashing with SHA-256 and random salt | `hashPassword()`, `verifyPassword()` |
-| `src/lib/feedFetcher.ts` | Concurrent feed orchestration with batching and deduplication | `fetchAllFeeds()` |
+| `src/lib/feedFetcher.ts` | Concurrent feed orchestration with batching and deduplication; `deduplicateEntries` helper keeps newest entry per ID | `fetchAllFeeds()` |
 | `src/lib/feedParser.ts` | Atom/RSS parsing and normalization into `CoffeeEntry` | `parseFeed()`, `parseAtomFeed()`, `parseRssFeed()` |
 | `src/lib/feedParserHelpers.ts` | Pure extraction helpers for XML text, images, prices | `deepText()`, `extractImage()`, `extractProductType()`, `extractShopifyPrice()`, `extractShopifyTags()` |
 | `src/lib/heuristics.ts` | Coffee metadata detection — type, process, tasting notes, price, merch | `detectType()`, `detectProcess()`, `extractNotes()`, `extractPrice()`, `isMerchandise()` |
