@@ -78,3 +78,10 @@
 - 3 pre-existing (carried from prior notable mentions), 1 pre-existing (newly flagged middleware), 1 introduced during AUDIT.md Fix #1
 - MANIFEST.md verified — no structural changes from AUDIT-2 fixes (all were internal refactorings with no export, file, or interface changes)
 - Gotcha: `fetchAllFeeds` and `fetchOne` catch have been in Notable Mentions for two audit cycles without being fixed; promoted to top 5 this cycle
+
+### 2026-04-13
+- Wrapped `await request.json()` in try/catch in 3 POST handlers (AUDIT-3.md Violation #1)
+- `src/app/api/auth/login/route.ts`: malformed JSON now returns 400 instead of unstructured 500
+- `src/app/api/admin/site-auth/route.ts`: same fix
+- `src/app/api/admin/sources/route.ts`: same fix
+- No other logic changed; existing validation after parse is untouched

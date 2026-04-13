@@ -5,7 +5,12 @@ import { createSessionCookie } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid or missing JSON body" }, { status: 400 });
+  }
   const { username, password } = body;
 
   if (typeof username !== "string" || !username.trim() || typeof password !== "string" || !password.trim()) {
