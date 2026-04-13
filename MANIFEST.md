@@ -34,7 +34,7 @@
 | `src/app/api/cron/route.ts` | Cron endpoint — fetches all feeds, persists, cleans old data | `GET` handler (bearer token auth) |
 | `src/app/api/auth/login/route.ts` | Login endpoint — validates credentials, sets session cookie | `POST` handler |
 | `src/app/api/auth/logout/route.ts` | Logout endpoint — clears session cookie | `POST` handler |
-| `src/app/api/admin/sources/route.ts` | Admin source management — CRUD, discovery, triage, suggestions | `GET`, `POST` handlers |
+| `src/app/api/admin/sources/route.ts` | Admin source management — CRUD, discovery, triage, suggestions; POST dispatches to 8 module-private action handlers | `GET`, `POST` handlers |
 | `src/app/api/admin/sources/csv/route.ts` | Exports source list as CSV | `GET` handler |
 | `src/app/api/admin/site-auth/route.ts` | Admin user management — list, add, remove site users | `GET`, `POST` handlers |
 | `src/components/CoffeeTable.tsx` | Main UI orchestrator — data fetching, filtering, rendering | Client component |

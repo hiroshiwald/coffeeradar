@@ -43,3 +43,9 @@
 - Two minor issues introduced during Fix #1: fire-and-forget in useOwnerCron.ts:45, borderline 53-line SiteAccessControl component
 - Updated MANIFEST.md with 15 new files from Fix #1 refactoring and updated module descriptions
 - Gotcha: `probeForWorkingFeed` extracted from `triageFailedFeed` in Fix #5 is itself 55 lines — extraction moved the violation rather than eliminating it
+
+### 2026-04-13
+- Refactored POST handler in `src/app/api/admin/sources/route.ts` from 133-line monolith into 8 module-private handler functions + thin dispatcher (AUDIT-2.md #1)
+- All functions ≤26 lines; POST dispatcher is 21 lines
+- No export, interface, or response shape changes; pure mechanical extraction
+- No new files created — all handlers remain in the same route file
