@@ -102,3 +102,8 @@
 - Extracted deduplication logic from `fetchAllFeeds()` into module-private `deduplicateEntries` helper in `src/lib/feedFetcher.ts` (AUDIT-3.md Violation #2)
 - `fetchAllFeeds()` reduced from 54 to 40 lines; deduplication logic unchanged, just relocated
 - No export, interface, or behavior changes
+
+### 2026-04-13
+- Added CLAUDE.md 50-line exception comment to `middleware()` in `middleware.ts` (AUDIT-3.md Violation #3)
+- Documents why the 59-line function is kept together: 5 route-class auth dispatch as single concern, intentional catch-block duplication for fail-closed safety
+- No logic or structural changes

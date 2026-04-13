@@ -34,6 +34,10 @@ function handleBasicAuth(req: NextRequest): NextResponse {
   return NextResponse.next();
 }
 
+// CLAUDE.md 50-line exception: Auth middleware handles 5 route classes as a
+// single concern. The catch block intentionally duplicates redirect-vs-401
+// logic for fail-closed defense-in-depth. Splitting would scatter tightly
+// coupled route classification without reducing actual complexity.
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   try {
     const { pathname } = req.nextUrl;
