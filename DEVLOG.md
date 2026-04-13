@@ -61,3 +61,8 @@
 - GET is now 14 lines; `handleWithDb` is 43 lines — both under the 50-line limit
 - Merged duplicate normal-read return branches (empty vs non-empty DB) into one using `isEmpty` flag
 - No export, interface, or response shape changes; `handleWithDb` mirrors existing `handleWithoutDb` pattern
+
+### 2026-04-13
+- Refactored `crawlKeywordAnchors` in `src/lib/feedTriage.ts` from 58 to 45 lines (AUDIT-2.md #4)
+- Extracted `anchorTextBlob` helper — combines visible text, aria-label, and title into a lowercase search blob
+- No export, interface, or caller changes; all 12 feedTriage tests pass unchanged

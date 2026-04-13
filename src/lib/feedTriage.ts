@@ -187,6 +187,14 @@ async function checkSiteAlive(rootUrl: string): Promise<SiteAliveResult> {
   return classifyAfterRedirect(res, status, rootUrl, requestedHost);
 }
 
+/** Combine visible text, aria-label, and title into a single lowercase search blob. */
+function anchorTextBlob(attrs: string, innerHtml: string): string {
+  const visible = innerHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+  const aria = attrs.match(/aria-label\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase() ?? "";
+  const title = attrs.match(/title\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase() ?? "";
+  return `${visible} ${aria} ${title}`;
+}
+
 /**
  * Parse anchors out of the root HTML and keep those whose visible text (or
  * an attribute like aria-label) contains a keyword. Resolve hrefs to absolute
@@ -206,20 +214,7 @@ function crawlKeywordAnchors(html: string, rootUrl: string): string[] {
     if (!hrefMatch) continue;
     const href = hrefMatch[1];
 
-    // Assemble a blob of text we consider "link text" for keyword matching.
-    const visibleText = inner
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase();
-    const ariaMatch = attrs.match(/aria-label\s*=\s*["']([^"']+)["']/i);
-    const titleMatch = attrs.match(/title\s*=\s*["']([^"']+)["']/i);
-    const textBlob = [
-      visibleText,
-      ariaMatch?.[1]?.toLowerCase() ?? "",
-      titleMatch?.[1]?.toLowerCase() ?? "",
-    ].join(" ");
-
+    const textBlob = anchorTextBlob(attrs, inner);
     const hit = LINK_KEYWORDS.some((kw) => textBlob.includes(kw));
     if (!hit) continue;
 
