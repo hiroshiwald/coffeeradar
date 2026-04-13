@@ -42,7 +42,8 @@ export function useOwnerCron({ setSuggestions, fetchSources, setStatusMessage }:
     const data = await res.json();
     if (res.ok) {
       setStatusMessage(`Cron done: ${data.inserted} coffees inserted, ${data.healthy}/${data.total} feeds healthy.`);
-      fetchSources();
+      // Intentional detach: refresh sources in background so cron button re-enables immediately
+      fetchSources().catch(err => console.error("Post-cron source refresh failed:", err));
     } else {
       setStatusMessage(data.error ?? "Cron failed.");
     }

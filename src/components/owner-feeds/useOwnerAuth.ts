@@ -8,10 +8,14 @@ export function useOwnerAuth() {
   const [authBusy, setAuthBusy] = useState(false);
 
   const fetchSiteAuth = useCallback(async () => {
-    const res = await fetch("/api/admin/site-auth");
-    const data = await res.json();
-    setSiteUsers(data.users ?? []);
-    setProtectionEnabled(data.protectionEnabled ?? false);
+    try {
+      const res = await fetch("/api/admin/site-auth");
+      const data = await res.json();
+      setSiteUsers(data.users ?? []);
+      setProtectionEnabled(data.protectionEnabled ?? false);
+    } catch (err) {
+      console.error("Failed to fetch site auth:", err);
+    }
   }, []);
 
   useEffect(() => {
