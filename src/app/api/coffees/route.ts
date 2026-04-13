@@ -4,6 +4,7 @@ import { fetchAllFeeds } from "@/lib/feedFetcher";
 import { FALLBACK_COFFEES } from "@/lib/fallback";
 import { ApiResponse } from "@/lib/types";
 import { checkSiteAuthFromRequest } from "@/lib/authGuard";
+import { logger } from "@/lib/logger";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -73,7 +74,8 @@ export async function GET(request: NextRequest) {
         isFallback: false,
       },
     } satisfies ApiResponse);
-  } catch {
+  } catch (err) {
+    logger.error("[coffees] DB read failed, returning fallback", err);
     return NextResponse.json({
       coffees: FALLBACK_COFFEES,
       meta: { healthy: 0, failed: 0, total: 0, lastRefresh: new Date().toISOString(), isFallback: true },
@@ -104,7 +106,8 @@ async function handleWithoutDb(forceRefresh: boolean): Promise<NextResponse> {
     };
     localCache = { data: response, ts: Date.now() };
     return NextResponse.json(response);
-  } catch {
+  } catch (err) {
+    logger.error("[coffees] feed fetch failed, returning fallback", err);
     return NextResponse.json({
       coffees: FALLBACK_COFFEES,
       meta: { healthy: 0, failed: 0, total: 0, lastRefresh: new Date().toISOString(), isFallback: true },
