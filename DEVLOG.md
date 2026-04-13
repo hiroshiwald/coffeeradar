@@ -92,3 +92,8 @@
 - `src/components/owner-feeds/useOwnerSources.ts`: wrapped `fetchSources` body in try/catch with `finally` for `setLoading(false)`, errors logged via `console.error`
 - `src/components/owner-feeds/useOwnerCron.ts`: added `.catch()` to fire-and-forget `fetchSources()` call with detach comment
 - No public API changes; network errors now log to console and fail gracefully to default state instead of crashing component tree
+
+### 2026-04-13
+- Added `logger.warn` to silent catch block in `fetchOne()` in `src/lib/feedFetcher.ts` (AUDIT-3.md Violation #4)
+- Feed failures (DNS, timeout, TLS) now log source name, URL, and error via `logger` — previously invisible
+- No behavior change — graceful degradation with `{ entries: [], ok: false }` preserved
