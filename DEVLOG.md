@@ -119,3 +119,10 @@
 - Added `content-visibility: auto` and removed `transition-colors` from `<tr>` in `src/components/coffee-table/CoffeeTableRow.tsx`
 - Browser now skips layout/paint for off-screen rows; CSS transition state tracking eliminated across 300+ elements
 - No structural, prop, or logic changes — purely CSS-level performance fix
+
+### 2026-04-13
+- Virtualized coffee table with `@tanstack/react-virtual` — only ~30 rows rendered to DOM instead of 500+
+- `src/components/CoffeeTable.tsx`: added `useVirtualizer`, scroll container with `maxHeight`, extracted `VirtualizedBody` helper; scroll resets to top on filter/sort changes
+- `src/components/coffee-table/CoffeeTableHeader.tsx`: moved background from `<tr>` to each `<th>` for opaque sticky header
+- Added `@tanstack/react-virtual` dependency
+- CoffeeTableRow and useCoffeeFilters unchanged; spacer `<tr>` elements maintain scroll height
