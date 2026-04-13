@@ -49,3 +49,9 @@
 - All functions ≤26 lines; POST dispatcher is 21 lines
 - No export, interface, or response shape changes; pure mechanical extraction
 - No new files created — all handlers remain in the same route file
+
+### 2026-04-13
+- Refactored `initDb` in `src/lib/db.ts` from 83-line monolith into 3 parts (AUDIT-2.md #2)
+- Extracted `SCHEMA_DDL` module-level const (DDL strings), `createSchema(db)` (3 lines), `seedFeedSources(db)` (18 lines)
+- `initDb()` is now a 5-line orchestrator; no export, signature, or caller changes
+- No new files; all helpers are module-private
