@@ -18,11 +18,14 @@ export async function GET(request: NextRequest) {
 
   const forceRefresh = request.nextUrl.searchParams.get("refresh") === "true";
 
-  // If Turso is not configured, fall back to direct feed fetching (local dev)
   if (!hasTurso()) {
     return handleWithoutDb(forceRefresh);
   }
 
+  return handleWithDb(forceRefresh);
+}
+
+async function handleWithDb(forceRefresh: boolean): Promise<NextResponse> {
   try {
     await initDb();
 
@@ -35,44 +38,27 @@ export async function GET(request: NextRequest) {
         await saveFeedHealth(healthy, failed, total);
       }
       const coffees = await getCoffees();
-      const response: ApiResponse = {
+      return NextResponse.json({
         coffees: coffees.length > 0 ? coffees : FALLBACK_COFFEES,
         meta: {
-          healthy,
-          failed,
-          total,
+          healthy, failed, total,
           lastRefresh: new Date().toISOString(),
           isFallback: coffees.length === 0,
-        },
-      };
-      return NextResponse.json(response);
-    }
-
-    // Normal path: read from DB (instant)
-    const [coffees, health] = await Promise.all([getCoffees(), getFeedHealth()]);
-
-    if (coffees.length === 0) {
-      // DB empty — return fallback data
-      return NextResponse.json({
-        coffees: FALLBACK_COFFEES,
-        meta: {
-          healthy: health?.healthy ?? 0,
-          failed: health?.failed ?? 0,
-          total: health?.total ?? 0,
-          lastRefresh: health?.lastRefresh ?? new Date().toISOString(),
-          isFallback: true,
         },
       } satisfies ApiResponse);
     }
 
+    // Normal path: read from DB (instant)
+    const [coffees, health] = await Promise.all([getCoffees(), getFeedHealth()]);
+    const isEmpty = coffees.length === 0;
     return NextResponse.json({
-      coffees,
+      coffees: isEmpty ? FALLBACK_COFFEES : coffees,
       meta: {
         healthy: health?.healthy ?? 0,
         failed: health?.failed ?? 0,
         total: health?.total ?? 0,
         lastRefresh: health?.lastRefresh ?? new Date().toISOString(),
-        isFallback: false,
+        isFallback: isEmpty,
       },
     } satisfies ApiResponse);
   } catch (err) {
