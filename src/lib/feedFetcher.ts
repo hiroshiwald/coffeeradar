@@ -35,6 +35,23 @@ async function fetchOne(source: FetchTarget): Promise<{ entries: CoffeeEntry[]; 
   }
 }
 
+function deduplicateEntries(entries: CoffeeEntry[]): CoffeeEntry[] {
+  const deduped = new Map<string, CoffeeEntry>();
+  for (const entry of entries) {
+    const existing = deduped.get(entry.id);
+    if (!existing) {
+      deduped.set(entry.id, entry);
+      continue;
+    }
+    const existingDate = new Date(existing.date).getTime() || 0;
+    const incomingDate = new Date(entry.date).getTime() || 0;
+    if (incomingDate > existingDate) {
+      deduped.set(entry.id, entry);
+    }
+  }
+  return Array.from(deduped.values());
+}
+
 export async function fetchAllFeeds(): Promise<{
   coffees: CoffeeEntry[];
   healthy: number;
@@ -65,27 +82,13 @@ export async function fetchAllFeeds(): Promise<{
     }
   }
 
-  const deduped = new Map<string, CoffeeEntry>();
-  for (const entry of allEntries) {
-    const existing = deduped.get(entry.id);
-    if (!existing) {
-      deduped.set(entry.id, entry);
-      continue;
-    }
-    const existingDate = new Date(existing.date).getTime() || 0;
-    const incomingDate = new Date(entry.date).getTime() || 0;
-    if (incomingDate > existingDate) {
-      deduped.set(entry.id, entry);
-    }
-  }
+  const deduplicated = deduplicateEntries(allEntries);
 
-  const normalized = Array.from(deduped.values());
-
-  normalized.sort((a, b) => {
+  deduplicated.sort((a, b) => {
     const da = new Date(a.date).getTime() || 0;
     const db = new Date(b.date).getTime() || 0;
     return db - da;
   });
 
-  return { coffees: normalized, healthy, failed, total: enabled.length, feedResults };
+  return { coffees: deduplicated, healthy, failed, total: enabled.length, feedResults };
 }

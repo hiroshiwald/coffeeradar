@@ -97,3 +97,8 @@
 - Added `logger.warn` to silent catch block in `fetchOne()` in `src/lib/feedFetcher.ts` (AUDIT-3.md Violation #4)
 - Feed failures (DNS, timeout, TLS) now log source name, URL, and error via `logger` — previously invisible
 - No behavior change — graceful degradation with `{ entries: [], ok: false }` preserved
+
+### 2026-04-13
+- Extracted deduplication logic from `fetchAllFeeds()` into module-private `deduplicateEntries` helper in `src/lib/feedFetcher.ts` (AUDIT-3.md Violation #2)
+- `fetchAllFeeds()` reduced from 54 to 40 lines; deduplication logic unchanged, just relocated
+- No export, interface, or behavior changes
