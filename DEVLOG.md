@@ -1,5 +1,11 @@
 ## Development Log
 
+### 2026-04-13
+- Added conditional HTTP fetching with `If-Modified-Since` and `ETag` support to skip re-downloading unchanged feeds
+- Modified `src/lib/feedFetcher.ts` (fetchOne accepts metadata, fetchAllFeeds loads/saves it), `src/lib/db.ts` (schema migration adds `last_modified`/`etag` columns to `feed_results`, new `getFeedHttpMeta` query, extended `saveFeedResults`)
+- Non-Turso path uses module-scoped Map; Turso path persists to `feed_results` table
+- 304 responses count as healthy with zero entries; no caller changes needed
+
 ### 2026-04-12
 - Initialized project governance files (CLAUDE.md, MANIFEST.md, DEVLOG.md)
 - No code changes
