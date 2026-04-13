@@ -36,3 +36,10 @@
 - Extracted `classifyAfterRedirect` (post-redirect response classification) and `probeForWorkingFeed` (product page crawl + feed probing) as module-private helpers
 - No export, interface, or test changes; all 12 existing tests pass unchanged
 - Gotcha: status-check ordering is deliberate — hard-dead/5xx before redirect check, auth-gated after — split boundary preserves this
+
+### 2026-04-13
+- Audit compliance review: confirmed all 5 AUDIT.md fixes resolved; ran fresh full-codebase scan
+- Created AUDIT-2.md with 5 new top violations (3 pre-existing function-length in route handlers and db.ts, 1 pre-existing in feedTriage, 1 introduced during Fix #5)
+- Two minor issues introduced during Fix #1: fire-and-forget in useOwnerCron.ts:45, borderline 53-line SiteAccessControl component
+- Updated MANIFEST.md with 15 new files from Fix #1 refactoring and updated module descriptions
+- Gotcha: `probeForWorkingFeed` extracted from `triageFailedFeed` in Fix #5 is itself 55 lines — extraction moved the violation rather than eliminating it
