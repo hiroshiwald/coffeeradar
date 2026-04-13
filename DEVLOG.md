@@ -107,3 +107,10 @@
 - Added CLAUDE.md 50-line exception comment to `middleware()` in `middleware.ts` (AUDIT-3.md Violation #3)
 - Documents why the 59-line function is kept together: 5 route-class auth dispatch as single concern, intentional catch-block duplication for fail-closed safety
 - No logic or structural changes
+
+### 2026-04-13
+- Memoized `CoffeeTableRow` with `React.memo` and stabilized `onSelectNote` with `useCallback` in `CoffeeTable.tsx`
+- `src/components/coffee-table/CoffeeTableRow.tsx`: wrapped export in `memo()`
+- `src/components/CoffeeTable.tsx`: added `useCallback` around `setFilterNote` passed as `onSelectNote`
+- Prevents unnecessary re-renders of all 300+ rows on every filter/sort state change
+- Note: `setFilterNote` is a `useState` setter (already stable), so `useCallback` is belt-and-suspenders here
