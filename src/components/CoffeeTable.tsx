@@ -12,7 +12,7 @@ import CoffeeTableHeader from "./coffee-table/CoffeeTableHeader";
 import CoffeeTableRow from "./coffee-table/CoffeeTableRow";
 
 export default function CoffeeTable() {
-  const { data, loading, refresh } = useCoffeeData();
+  const { data, loading, refresh, isBackgroundRefreshing } = useCoffeeData();
   const {
     filters,
     sortKey,
@@ -57,6 +57,7 @@ export default function CoffeeTable() {
         showMerch={filters.showMerch}
         merchCount={merchCount}
         loading={loading}
+        isBackgroundRefreshing={isBackgroundRefreshing}
         onSearchChange={setSearch}
         onTypeChange={setFilterType}
         onProcessChange={setFilterProcess}

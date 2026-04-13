@@ -7,6 +7,7 @@ interface Props {
   showMerch: boolean;
   merchCount: number;
   loading: boolean;
+  isBackgroundRefreshing: boolean;
   onSearchChange: (v: string) => void;
   onTypeChange: (v: string) => void;
   onProcessChange: (v: string) => void;
@@ -21,6 +22,7 @@ export default function CoffeeTableFilters({
   showMerch,
   merchCount,
   loading,
+  isBackgroundRefreshing,
   onSearchChange,
   onTypeChange,
   onProcessChange,
@@ -89,7 +91,7 @@ export default function CoffeeTableFilters({
 
       <button
         onClick={onRefresh}
-        disabled={loading}
+        disabled={loading || isBackgroundRefreshing}
         className="px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50 whitespace-nowrap"
       >
         {loading ? (
@@ -104,6 +106,11 @@ export default function CoffeeTableFilters({
           "Refresh"
         )}
       </button>
+      {isBackgroundRefreshing && (
+        <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+          Updating feeds&hellip;
+        </span>
+      )}
     </div>
   );
 }
