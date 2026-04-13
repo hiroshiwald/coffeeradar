@@ -128,6 +128,41 @@ interface SiteAliveResult {
   rootHtml?: string;
 }
 
+/**
+ * Classify a response after hard-dead and 5xx statuses have been ruled out.
+ * Resolves the final host from the redirect chain and handles offsite
+ * redirects, auth-gated responses, other non-ok statuses, and success.
+ */
+async function classifyAfterRedirect(
+  res: Response,
+  status: number,
+  rootUrl: string,
+  requestedHost: string,
+): Promise<SiteAliveResult> {
+  let finalHost: string;
+  try {
+    finalHost = new URL(res.url || rootUrl).hostname;
+  } catch {
+    finalHost = requestedHost;
+  }
+
+  if (!sameRegistrableDomain(finalHost, requestedHost)) {
+    return { alive: false, reason: "redirected_offsite", rootStatus: status, rootFinalHost: finalHost };
+  }
+
+  // 401/403: site is up but gated — caller should fall through to manual_review.
+  if (status === 401 || status === 403) {
+    return { alive: true, reason: `http_${status}`, rootStatus: status, rootFinalHost: finalHost };
+  }
+
+  if (!res.ok) {
+    return { alive: false, reason: `http_${status}`, rootStatus: status, rootFinalHost: finalHost };
+  }
+
+  const html = await res.text().catch(() => "");
+  return { alive: true, reason: "ok", rootStatus: status, rootFinalHost: finalHost, rootHtml: html };
+}
+
 async function checkSiteAlive(rootUrl: string): Promise<SiteAliveResult> {
   const requestedHost = new URL(rootUrl).hostname;
   const outcome = await safeFetch(rootUrl, "GET");
@@ -144,59 +179,12 @@ async function checkSiteAlive(rootUrl: string): Promise<SiteAliveResult> {
     return { alive: false, reason: `http_${status}`, rootStatus: status };
   }
 
-  // Persistent server errors: the cron run has already produced the failure,
-  // so a 5xx here is treated as effectively dead for triage purposes. Admin
-  // can dismiss if it's transient.
+  // Persistent server errors: treated as effectively dead for triage purposes.
   if (status >= 500 && status < 600) {
     return { alive: false, reason: `http_${status}`, rootStatus: status };
   }
 
-  // Redirect chain already followed. Compare the final URL's host to the
-  // requested host; if we've landed on an unrelated domain, the original
-  // site is effectively gone.
-  let finalHost: string;
-  try {
-    finalHost = new URL(res.url || rootUrl).hostname;
-  } catch {
-    finalHost = requestedHost;
-  }
-  if (!sameRegistrableDomain(finalHost, requestedHost)) {
-    return {
-      alive: false,
-      reason: "redirected_offsite",
-      rootStatus: status,
-      rootFinalHost: finalHost,
-    };
-  }
-
-  // 401/403: site is up but gated — we can't crawl it, so caller should fall
-  // through to manual_review.
-  if (status === 401 || status === 403) {
-    return {
-      alive: true,
-      reason: `http_${status}`,
-      rootStatus: status,
-      rootFinalHost: finalHost,
-    };
-  }
-
-  if (!res.ok) {
-    return {
-      alive: false,
-      reason: `http_${status}`,
-      rootStatus: status,
-      rootFinalHost: finalHost,
-    };
-  }
-
-  const html = await res.text().catch(() => "");
-  return {
-    alive: true,
-    reason: "ok",
-    rootStatus: status,
-    rootFinalHost: finalHost,
-    rootHtml: html,
-  };
+  return classifyAfterRedirect(res, status, rootUrl, requestedHost);
 }
 
 /**
@@ -403,38 +391,12 @@ async function probeFeedCandidate(url: string): Promise<ProbeResult> {
   return { ok: true, reason: "ok", contentType: contentType ?? undefined, status: res.status };
 }
 
-export async function triageFailedFeed(source: FeedSource): Promise<TriageResult> {
-  const root = rootOf(source);
-  if (!root) {
-    return {
-      site: source.website || source.url,
-      sourceUrl: source.url,
-      name: source.name,
-      status: "recommend_deletion",
-      recommendation: "Source has no parseable root URL.",
-      diagnostics: { siteAlive: false, productPagesProbed: [], feedUrlsProbed: [] },
-    };
-  }
-
-  const alive = await checkSiteAlive(root);
-
-  if (!alive.alive) {
-    return {
-      site: root,
-      sourceUrl: source.url,
-      name: source.name,
-      status: "recommend_deletion",
-      recommendation: `Site appears dead (${alive.reason}). Recommend deletion.`,
-      diagnostics: {
-        siteAlive: false,
-        rootStatus: alive.rootStatus,
-        rootFinalHost: alive.rootFinalHost,
-        productPagesProbed: [],
-        feedUrlsProbed: [],
-      },
-    };
-  }
-
+/** Crawl product pages and probe feed extensions; return recommend_add or manual_review. */
+async function probeForWorkingFeed(
+  source: FeedSource,
+  root: string,
+  alive: SiteAliveResult,
+): Promise<TriageResult> {
   const productPages = alive.rootHtml
     ? collectProductPageCandidates(root, alive.rootHtml)
     : STATIC_PRODUCT_PATHS.map((p) =>
@@ -484,6 +446,41 @@ export async function triageFailedFeed(source: FeedSource): Promise<TriageResult
       feedUrlsProbed,
     },
   };
+}
+
+export async function triageFailedFeed(source: FeedSource): Promise<TriageResult> {
+  const root = rootOf(source);
+  if (!root) {
+    return {
+      site: source.website || source.url,
+      sourceUrl: source.url,
+      name: source.name,
+      status: "recommend_deletion",
+      recommendation: "Source has no parseable root URL.",
+      diagnostics: { siteAlive: false, productPagesProbed: [], feedUrlsProbed: [] },
+    };
+  }
+
+  const alive = await checkSiteAlive(root);
+
+  if (!alive.alive) {
+    return {
+      site: root,
+      sourceUrl: source.url,
+      name: source.name,
+      status: "recommend_deletion",
+      recommendation: `Site appears dead (${alive.reason}). Recommend deletion.`,
+      diagnostics: {
+        siteAlive: false,
+        rootStatus: alive.rootStatus,
+        rootFinalHost: alive.rootFinalHost,
+        productPagesProbed: [],
+        feedUrlsProbed: [],
+      },
+    };
+  }
+
+  return probeForWorkingFeed(source, root, alive);
 }
 
 export async function triageFailedFeeds(

@@ -30,3 +30,9 @@
 - `src/app/api/auth/login/route.ts`: username/password checked as strings, not just truthy
 - `src/app/api/admin/site-auth/route.ts`: username/password/action checked as strings
 - No behavior change for valid inputs; invalid inputs now return 400 with descriptive messages
+
+### 2026-04-13
+- Refactored `checkSiteAlive` and `triageFailedFeed` in `src/lib/feedTriage.ts` to comply with 50-line function limit (AUDIT.md #5)
+- Extracted `classifyAfterRedirect` (post-redirect response classification) and `probeForWorkingFeed` (product page crawl + feed probing) as module-private helpers
+- No export, interface, or test changes; all 12 existing tests pass unchanged
+- Gotcha: status-check ordering is deliberate — hard-dead/5xx before redirect check, auth-gated after — split boundary preserves this
