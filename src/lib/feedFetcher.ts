@@ -2,6 +2,7 @@ import { CoffeeEntry } from "./types";
 import { parseFeed } from "./feedParser";
 import { listEnabledMasterSources } from "./sourceStore";
 import { FEED_CONCURRENCY, FEED_TIMEOUT_MS } from "./constants";
+import { logger } from "./logger";
 
 export interface FeedResult {
   url: string;
@@ -28,7 +29,8 @@ async function fetchOne(source: FetchTarget): Promise<{ entries: CoffeeEntry[]; 
     const xml = await res.text();
     const entries = parseFeed(xml, source.name, source.website);
     return { entries, ok: entries.length > 0 };
-  } catch {
+  } catch (err) {
+    logger.warn(`[fetchOne] ${source.name} (${source.url}) failed`, err);
     return { entries: [], ok: false };
   }
 }
