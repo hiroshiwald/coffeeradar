@@ -123,7 +123,7 @@ describe("fetchAllFeeds", () => {
     expect(result.coffees).toHaveLength(1);
   });
 
-  it("includes entries with old publication dates", async () => {
+  it("filters out entries older than 30 days", async () => {
     const sources = [
       { name: "Old Roaster", url: "https://old.com/feed", website: "https://old.com" },
     ];
@@ -135,7 +135,37 @@ describe("fetchAllFeeds", () => {
     });
 
     const result = await fetchAllFeeds();
+    expect(result.coffees).toHaveLength(0);
+    expect(result.healthy).toBe(1);
+  });
+
+  it("keeps entries within last 30 days", async () => {
+    const sources = [
+      { name: "Recent Roaster", url: "https://recent.com/feed", website: "https://recent.com" },
+    ];
+    vi.mocked(listEnabledMasterSources).mockResolvedValue(sources);
+
+    const recentDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    globalThis.fetch = mockFetch({
+      "https://recent.com/feed": ATOM_FEED("Recent Coffee", recentDate),
+    });
+
+    const result = await fetchAllFeeds();
     expect(result.coffees).toHaveLength(1);
+  });
+
+  it("excludes entries with unparseable dates", async () => {
+    const sources = [
+      { name: "Bad Date", url: "https://bad.com/feed", website: "https://bad.com" },
+    ];
+    vi.mocked(listEnabledMasterSources).mockResolvedValue(sources);
+
+    globalThis.fetch = mockFetch({
+      "https://bad.com/feed": ATOM_FEED("Bad Date Coffee", "not-a-date"),
+    });
+
+    const result = await fetchAllFeeds();
+    expect(result.coffees).toHaveLength(0);
     expect(result.healthy).toBe(1);
   });
 

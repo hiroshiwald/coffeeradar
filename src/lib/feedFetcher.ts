@@ -164,11 +164,18 @@ export async function fetchAllFeeds(): Promise<{
 
   const deduplicated = deduplicateEntries(allEntries);
 
-  deduplicated.sort((a, b) => {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const recent = deduplicated.filter(entry => {
+    const d = new Date(entry.date).getTime();
+    return !isNaN(d) && d >= cutoff.getTime();
+  });
+
+  recent.sort((a, b) => {
     const da = new Date(a.date).getTime() || 0;
     const db = new Date(b.date).getTime() || 0;
     return db - da;
   });
 
-  return { coffees: deduplicated, healthy, failed, total: enabled.length, feedResults };
+  return { coffees: recent, healthy, failed, total: enabled.length, feedResults };
 }
