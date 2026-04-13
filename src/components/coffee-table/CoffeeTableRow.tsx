@@ -12,7 +12,10 @@ interface Props {
 
 function CoffeeTableRow({ coffee: c, onSelectNote }: Props) {
   return (
-    <tr className="hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors">
+    <tr
+      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 56px' }}
+      className="hover:bg-gray-50 dark:hover:bg-gray-900/30"
+    >
       <td className="px-4 py-2">
         {c.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
