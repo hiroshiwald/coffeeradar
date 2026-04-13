@@ -790,3 +790,8 @@ never returns them.
 - **Added**: `@vercel/functions` dependency for `waitUntil`.
 - **Gotcha**: `handleWithoutDb` with `forceRefresh && !localCache` (first load) still does synchronous fetch — nothing stale to serve.
 
+### 2026-04-13 — Filter stale entries in fetchAllFeeds
+- Added 30-day cutoff filter in `src/lib/feedFetcher.ts` `fetchAllFeeds()` after deduplication, before sort
+- Entries with unparseable dates are also excluded
+- Prevents stale entries from being stored in DB or returned on the non-DB path
+- DB-side filter in `getCoffees()` kept as defense-in-depth
