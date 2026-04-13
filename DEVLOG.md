@@ -801,3 +801,8 @@ never returns them.
 - **Changed**: `src/lib/feedParser.ts` — both `parseAtomFeed()` and `parseRssFeed()` now convert `publishedAt` to ISO via `new Date().toISOString()` before setting the `date` field; `buildStableId` still uses raw string for ID stability
 - **Changed**: `src/lib/db.ts` — `cleanOldEntries()` DELETE now includes `OR date NOT LIKE '20__-%'` to catch any legacy non-ISO dates on next cron run
 - No schema changes, no new dependencies
+
+### 2026-04-13 — Fix: run cleanup during manual refresh, not just cron
+- **Problem**: `cleanOldData()` only ran in `/api/cron`; manual refresh via `?refresh=true` on `/api/coffees` never pruned stale entries, so old data lingered until the next daily cron run
+- **Changed**: `src/app/api/coffees/route.ts` — added `cleanOldData` import from `@/lib/db` and `await cleanOldData()` call inside `handleWithDb`'s `scheduleBackground` callback, after `saveFeedHealth`
+- No changes to `handleWithoutDb`, cron route, or `cleanOldData` itself
