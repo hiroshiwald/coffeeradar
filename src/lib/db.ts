@@ -17,88 +17,95 @@ export function hasTurso(): boolean {
   return !!process.env.TURSO_DATABASE_URL;
 }
 
+const SCHEMA_DDL: string[] = [
+  `CREATE TABLE IF NOT EXISTS coffees (
+    id TEXT PRIMARY KEY,
+    roaster TEXT NOT NULL,
+    coffee TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'Unknown',
+    process TEXT DEFAULT '',
+    tasting_notes TEXT DEFAULT '[]',
+    price TEXT DEFAULT '',
+    date TEXT NOT NULL,
+    link TEXT DEFAULT '',
+    image_url TEXT DEFAULT '',
+    is_merch INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_coffees_date ON coffees(date)`,
+  `CREATE INDEX IF NOT EXISTS idx_coffees_created_at ON coffees(created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_coffees_type ON coffees(type)`,
+  `CREATE INDEX IF NOT EXISTS idx_coffees_is_merch ON coffees(is_merch)`,
+  `CREATE INDEX IF NOT EXISTS idx_coffees_identity ON coffees(roaster, coffee, link, date)`,
+  `CREATE TABLE IF NOT EXISTS feed_health (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    healthy INTEGER DEFAULT 0,
+    failed INTEGER DEFAULT 0,
+    total INTEGER DEFAULT 0,
+    last_refresh TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS feed_results (
+    url TEXT PRIMARY KEY,
+    status TEXT NOT NULL DEFAULT 'unknown',
+    last_checked TEXT DEFAULT (datetime('now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS feed_sources (
+    url TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    website TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_feed_sources_enabled ON feed_sources(enabled)`,
+  `CREATE TABLE IF NOT EXISTS feed_suggestions (
+    source_url TEXT PRIMARY KEY,
+    suggested_feed_url TEXT,
+    suggested_website TEXT,
+    preflight_ok INTEGER NOT NULL DEFAULT 0,
+    reason TEXT,
+    checked_at TEXT DEFAULT (datetime('now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS site_users (
+    username TEXT PRIMARY KEY,
+    password_hash TEXT NOT NULL,
+    salt TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS site_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )`,
+];
+
+async function createSchema(db: Client): Promise<void> {
+  await db.batch(SCHEMA_DDL);
+}
+
+async function seedFeedSources(db: Client): Promise<void> {
+  const existing = await db.execute(`SELECT COUNT(*) as count FROM feed_sources`);
+  const count = Number(existing.rows[0]?.count ?? 0);
+  if (count > 0) return;
+  const seeds = (seedSources as FeedSource[]).map((s) => ({
+    name: s.name,
+    url: s.url,
+    website: s.website || s.url,
+    enabled: s.enabled !== false,
+  }));
+  if (seeds.length === 0) return;
+  await db.batch(
+    seeds.map((s) => ({
+      sql: `INSERT OR IGNORE INTO feed_sources (name, url, website, enabled) VALUES (?, ?, ?, ?)`,
+      args: [s.name, s.url, s.website, s.enabled ? 1 : 0],
+    }))
+  );
+}
+
 export async function initDb(): Promise<void> {
   const db = getClient();
   if (!db) return;
-  await db.batch([
-    `CREATE TABLE IF NOT EXISTS coffees (
-      id TEXT PRIMARY KEY,
-      roaster TEXT NOT NULL,
-      coffee TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'Unknown',
-      process TEXT DEFAULT '',
-      tasting_notes TEXT DEFAULT '[]',
-      price TEXT DEFAULT '',
-      date TEXT NOT NULL,
-      link TEXT DEFAULT '',
-      image_url TEXT DEFAULT '',
-      is_merch INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_coffees_date ON coffees(date)`,
-    `CREATE INDEX IF NOT EXISTS idx_coffees_created_at ON coffees(created_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_coffees_type ON coffees(type)`,
-    `CREATE INDEX IF NOT EXISTS idx_coffees_is_merch ON coffees(is_merch)`,
-    `CREATE INDEX IF NOT EXISTS idx_coffees_identity ON coffees(roaster, coffee, link, date)`,
-    `CREATE TABLE IF NOT EXISTS feed_health (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      healthy INTEGER DEFAULT 0,
-      failed INTEGER DEFAULT 0,
-      total INTEGER DEFAULT 0,
-      last_refresh TEXT NOT NULL
-    )`,
-    `CREATE TABLE IF NOT EXISTS feed_results (
-      url TEXT PRIMARY KEY,
-      status TEXT NOT NULL DEFAULT 'unknown',
-      last_checked TEXT DEFAULT (datetime('now'))
-    )`,
-    `CREATE TABLE IF NOT EXISTS feed_sources (
-      url TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      website TEXT NOT NULL,
-      enabled INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_feed_sources_enabled ON feed_sources(enabled)`,
-    `CREATE TABLE IF NOT EXISTS feed_suggestions (
-      source_url TEXT PRIMARY KEY,
-      suggested_feed_url TEXT,
-      suggested_website TEXT,
-      preflight_ok INTEGER NOT NULL DEFAULT 0,
-      reason TEXT,
-      checked_at TEXT DEFAULT (datetime('now'))
-    )`,
-    `CREATE TABLE IF NOT EXISTS site_users (
-      username TEXT PRIMARY KEY,
-      password_hash TEXT NOT NULL,
-      salt TEXT NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
-    )`,
-    `CREATE TABLE IF NOT EXISTS site_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    )`,
-  ]);
-
-  const existing = await db.execute(`SELECT COUNT(*) as count FROM feed_sources`);
-  const count = Number(existing.rows[0]?.count ?? 0);
-  if (count === 0) {
-    const seeds = (seedSources as FeedSource[]).map((s) => ({
-      name: s.name,
-      url: s.url,
-      website: s.website || s.url,
-      enabled: s.enabled !== false,
-    }));
-    if (seeds.length > 0) {
-      await db.batch(
-        seeds.map((s) => ({
-          sql: `INSERT OR IGNORE INTO feed_sources (name, url, website, enabled) VALUES (?, ?, ?, ?)`,
-          args: [s.name, s.url, s.website, s.enabled ? 1 : 0],
-        }))
-      );
-    }
-  }
+  await createSchema(db);
+  await seedFeedSources(db);
 }
 
 export async function getFeedSources(enabledOnly = false): Promise<FeedSource[]> {
