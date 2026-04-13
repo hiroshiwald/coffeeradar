@@ -52,6 +52,23 @@ function deduplicateEntries(entries: CoffeeEntry[]): CoffeeEntry[] {
   return Array.from(deduped.values());
 }
 
+async function fetchWithPool<T>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<void>
+): Promise<void> {
+  let index = 0;
+  async function worker(): Promise<void> {
+    while (index < items.length) {
+      const i = index++;
+      await fn(items[i]);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker())
+  );
+}
+
 export async function fetchAllFeeds(): Promise<{
   coffees: CoffeeEntry[];
   healthy: number;
@@ -65,22 +82,17 @@ export async function fetchAllFeeds(): Promise<{
   let healthy = 0;
   let failed = 0;
 
-  for (let i = 0; i < enabled.length; i += FEED_CONCURRENCY) {
-    const batch = enabled.slice(i, i + FEED_CONCURRENCY);
-    const results = await Promise.all(batch.map(fetchOne));
-    for (let j = 0; j < batch.length; j++) {
-      const r = results[j];
-      const src = batch[j];
-      if (r.ok) {
-        healthy++;
-        allEntries.push(...r.entries);
-        feedResults.push({ url: src.url, status: "ok" });
-      } else {
-        failed++;
-        feedResults.push({ url: src.url, status: "error" });
-      }
+  await fetchWithPool(enabled, FEED_CONCURRENCY, async (source) => {
+    const r = await fetchOne(source);
+    if (r.ok) {
+      healthy++;
+      allEntries.push(...r.entries);
+      feedResults.push({ url: source.url, status: "ok" });
+    } else {
+      failed++;
+      feedResults.push({ url: source.url, status: "error" });
     }
-  }
+  });
 
   const deduplicated = deduplicateEntries(allEntries);
 
