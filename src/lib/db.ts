@@ -82,6 +82,18 @@ async function createSchema(db: Client): Promise<void> {
   await db.batch(SCHEMA_DDL);
 }
 
+async function migrateSchema(db: Client): Promise<void> {
+  // Add conditional-fetch metadata columns to feed_results.
+  // SQLite has no ADD COLUMN IF NOT EXISTS, so catch duplicate-column errors.
+  for (const col of ["last_modified", "etag"]) {
+    try {
+      await db.execute(`ALTER TABLE feed_results ADD COLUMN ${col} TEXT`);
+    } catch {
+      // Column already exists — safe to ignore.
+    }
+  }
+}
+
 async function seedFeedSources(db: Client): Promise<void> {
   const existing = await db.execute(`SELECT COUNT(*) as count FROM feed_sources`);
   const count = Number(existing.rows[0]?.count ?? 0);
@@ -105,6 +117,7 @@ export async function initDb(): Promise<void> {
   const db = getClient();
   if (!db) return;
   await createSchema(db);
+  await migrateSchema(db);
   await seedFeedSources(db);
 }
 
@@ -289,14 +302,16 @@ export async function cleanOldData(): Promise<{ coffees: number; feedResults: nu
   return { coffees, feedResults, duplicateCoffees };
 }
 
-export async function saveFeedResults(results: { url: string; status: string }[]): Promise<void> {
+export async function saveFeedResults(
+  results: { url: string; status: string; lastModified?: string; etag?: string }[],
+): Promise<void> {
   const db = getClient();
   if (!db || results.length === 0) return;
   await chunkedBatchInsert(
     db,
-    `INSERT OR REPLACE INTO feed_results (url, status, last_checked) VALUES (?, ?, datetime('now'))`,
+    `INSERT OR REPLACE INTO feed_results (url, status, last_checked, last_modified, etag) VALUES (?, ?, datetime('now'), ?, ?)`,
     results,
-    (r) => [r.url, r.status],
+    (r) => [r.url, r.status, r.lastModified ?? null, r.etag ?? null],
   );
 }
 
@@ -307,6 +322,27 @@ export async function getFeedResults(): Promise<Record<string, string>> {
   const map: Record<string, string> = {};
   for (const row of result.rows) {
     map[String(row.url)] = String(row.status);
+  }
+  return map;
+}
+
+export interface FeedHttpMeta {
+  lastModified?: string;
+  etag?: string;
+}
+
+export async function getFeedHttpMeta(): Promise<Record<string, FeedHttpMeta>> {
+  const db = getClient();
+  if (!db) return {};
+  const result = await db.execute(
+    `SELECT url, last_modified, etag FROM feed_results WHERE last_modified IS NOT NULL OR etag IS NOT NULL`,
+  );
+  const map: Record<string, FeedHttpMeta> = {};
+  for (const row of result.rows) {
+    const meta: FeedHttpMeta = {};
+    if (row.last_modified) meta.lastModified = String(row.last_modified);
+    if (row.etag) meta.etag = String(row.etag);
+    map[String(row.url)] = meta;
   }
   return map;
 }
