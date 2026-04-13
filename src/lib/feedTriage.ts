@@ -386,6 +386,20 @@ async function probeFeedCandidate(url: string): Promise<ProbeResult> {
   return { ok: true, reason: "ok", contentType: contentType ?? undefined, status: res.status };
 }
 
+function buildAliveDiagnostics(
+  alive: SiteAliveResult,
+  productPages: string[],
+  feedUrlsProbed: string[],
+): TriageDiagnostics {
+  return {
+    siteAlive: true,
+    rootStatus: alive.rootStatus,
+    rootFinalHost: alive.rootFinalHost,
+    productPagesProbed: productPages,
+    feedUrlsProbed,
+  };
+}
+
 /** Crawl product pages and probe feed extensions; return recommend_add or manual_review. */
 async function probeForWorkingFeed(
   source: FeedSource,
@@ -414,13 +428,7 @@ async function probeForWorkingFeed(
           recommendation: `Discovered working feed at ${feedUrl}. Recommend add.`,
           discoveredFeedUrl: feedUrl,
           discoveredWebsite: root,
-          diagnostics: {
-            siteAlive: true,
-            rootStatus: alive.rootStatus,
-            rootFinalHost: alive.rootFinalHost,
-            productPagesProbed: productPages,
-            feedUrlsProbed,
-          },
+          diagnostics: buildAliveDiagnostics(alive, productPages, feedUrlsProbed),
         };
       }
     }
@@ -433,13 +441,7 @@ async function probeForWorkingFeed(
     status: "manual_review",
     recommendation:
       "Site is alive but no feed could be reconstructed automatically. Manual review needed.",
-    diagnostics: {
-      siteAlive: true,
-      rootStatus: alive.rootStatus,
-      rootFinalHost: alive.rootFinalHost,
-      productPagesProbed: productPages,
-      feedUrlsProbed,
-    },
+    diagnostics: buildAliveDiagnostics(alive, productPages, feedUrlsProbed),
   };
 }
 
