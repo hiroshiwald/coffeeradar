@@ -66,3 +66,8 @@
 - Refactored `crawlKeywordAnchors` in `src/lib/feedTriage.ts` from 58 to 45 lines (AUDIT-2.md #4)
 - Extracted `anchorTextBlob` helper — combines visible text, aria-label, and title into a lowercase search blob
 - No export, interface, or caller changes; all 12 feedTriage tests pass unchanged
+
+### 2026-04-13
+- Refactored `probeForWorkingFeed` in `src/lib/feedTriage.ts` from 55 to 43 lines (AUDIT-2.md #5)
+- Extracted `buildAliveDiagnostics` helper — deduplicates identical 6-line diagnostics object in both return paths
+- No export, interface, or caller changes; all 12 feedTriage tests pass unchanged
