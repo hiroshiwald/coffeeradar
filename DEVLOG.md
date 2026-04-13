@@ -55,3 +55,9 @@
 - Extracted `SCHEMA_DDL` module-level const (DDL strings), `createSchema(db)` (3 lines), `seedFeedSources(db)` (18 lines)
 - `initDb()` is now a 5-line orchestrator; no export, signature, or caller changes
 - No new files; all helpers are module-private
+
+### 2026-04-13
+- Refactored GET handler in `src/app/api/coffees/route.ts` from 73-line monolith into thin dispatcher + `handleWithDb` helper (AUDIT-2.md #3)
+- GET is now 14 lines; `handleWithDb` is 43 lines — both under the 50-line limit
+- Merged duplicate normal-read return branches (empty vs non-empty DB) into one using `isEmpty` flag
+- No export, interface, or response shape changes; `handleWithDb` mirrors existing `handleWithoutDb` pattern
