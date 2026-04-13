@@ -16,3 +16,10 @@
 - `src/app/api/coffees/route.ts`: both catch blocks now log via `logger.error` before returning fallback data
 - `src/hooks/useCoffeeData.ts`: empty catch block now logs via `logger.warn`
 - No behavior change — fallback/keep-data strategy preserved, errors are now observable
+
+### 2026-04-13
+- Eliminated shared mutable state in `src/lib/sources.ts` (AUDIT.md #3)
+- `sources.ts`: converted 7 exported functions over 2 module-level variables into a `createInMemoryStore()` factory; all state lives in closure
+- `sourceStore.ts`: owns the singleton store privately; added `getSourceHealth()`/`setSourceHealth()` to centralize health data access
+- Route files (`coffees/route.ts`, `admin/sources/route.ts`, `sources/route.ts`) no longer import from `sources.ts` — all access goes through `sourceStore`
+- No behavior change — same lazy-load, same cross-request persistence in dev

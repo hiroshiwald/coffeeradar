@@ -1,28 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   hasTurso,
-  initDb,
-  getFeedResults,
   upsertFeedSuggestion,
   listFeedSuggestions,
   deleteFeedSuggestion,
 } from "@/lib/db";
-import { getInMemoryHealth } from "@/lib/sources";
-import { addOrUpdateMasterSource, listMasterSources, removeMasterSource, toggleMasterSource } from "@/lib/sourceStore";
+import {
+  addOrUpdateMasterSource,
+  getSourceHealth,
+  listMasterSources,
+  removeMasterSource,
+  toggleMasterSource,
+} from "@/lib/sourceStore";
 import { discoverFeedFromStoreUrl } from "@/lib/feedDiscovery";
 import { triageFailedFeeds, TriageResult } from "@/lib/feedTriage";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  let health: Record<string, string> = {};
-  if (hasTurso()) {
-    await initDb();
-    health = await getFeedResults();
-  } else {
-    health = getInMemoryHealth();
-  }
-
+  const health = await getSourceHealth();
   const sources = await listMasterSources();
   const suggestions = hasTurso() ? await listFeedSuggestions() : [];
   return NextResponse.json({ sources, health, suggestions });
@@ -57,8 +53,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "rescan_failed") {
-    if (hasTurso()) await initDb();
-    const health = hasTurso() ? await getFeedResults() : getInMemoryHealth();
+    const health = await getSourceHealth();
     const all = await listMasterSources();
     const failed = all.filter((s) => health[s.url] === "error" && s.enabled !== false);
 
