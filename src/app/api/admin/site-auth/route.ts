@@ -15,17 +15,25 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { action } = body;
 
+  if (typeof action !== "string" || !action.trim()) {
+    return NextResponse.json({ error: "action must be a non-empty string." }, { status: 400 });
+  }
+
   switch (action) {
     case "add_user": {
       const { username, password } = body;
-      if (!username || !password) return NextResponse.json({ error: "Required." }, { status: 400 });
+      if (typeof username !== "string" || !username.trim() || typeof password !== "string" || !password.trim()) {
+        return NextResponse.json({ error: "username and password must be non-empty strings." }, { status: 400 });
+      }
       await addSiteUser(username.trim(), password);
       const users = await listSiteUsers();
       return NextResponse.json({ users, message: `User "${username}" added.` });
     }
     case "remove_user": {
       const { username } = body;
-      if (!username) return NextResponse.json({ error: "Required." }, { status: 400 });
+      if (typeof username !== "string" || !username.trim()) {
+        return NextResponse.json({ error: "username must be a non-empty string." }, { status: 400 });
+      }
       await removeSiteUser(username);
       const users = await listSiteUsers();
       return NextResponse.json({ users, message: `User "${username}" removed.` });

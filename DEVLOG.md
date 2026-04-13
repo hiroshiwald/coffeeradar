@@ -23,3 +23,10 @@
 - `sourceStore.ts`: owns the singleton store privately; added `getSourceHealth()`/`setSourceHealth()` to centralize health data access
 - Route files (`coffees/route.ts`, `admin/sources/route.ts`, `sources/route.ts`) no longer import from `sources.ts` — all access goes through `sourceStore`
 - No behavior change — same lazy-load, same cross-request persistence in dev
+
+### 2026-04-13
+- Added input validation to admin API routes (AUDIT.md #4)
+- `src/app/api/admin/sources/route.ts`: all 7 action handlers now validate types and shapes; URL inputs validated via `new URL()`; `remove` and `toggle` actions no longer pass unvalidated input to downstream functions
+- `src/app/api/auth/login/route.ts`: username/password checked as strings, not just truthy
+- `src/app/api/admin/site-auth/route.ts`: username/password/action checked as strings
+- No behavior change for valid inputs; invalid inputs now return 400 with descriptive messages

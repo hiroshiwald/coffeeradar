@@ -15,6 +15,15 @@ import {
 import { discoverFeedFromStoreUrl } from "@/lib/feedDiscovery";
 import { triageFailedFeeds, TriageResult } from "@/lib/feedTriage";
 
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === "string" && v.trim().length > 0;
+}
+
+function isValidUrl(v: unknown): v is string {
+  if (!isNonEmptyString(v)) return false;
+  try { new URL(v); return true; } catch { return false; }
+}
+
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -28,10 +37,14 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { action } = body;
 
+  if (!isNonEmptyString(action)) {
+    return NextResponse.json({ error: "action must be a non-empty string" }, { status: 400 });
+  }
+
   if (action === "add_from_store") {
     const { name, storeUrl } = body;
-    if (!name || !storeUrl) {
-      return NextResponse.json({ error: "Name and store URL are required" }, { status: 400 });
+    if (!isNonEmptyString(name) || !isValidUrl(storeUrl)) {
+      return NextResponse.json({ error: "name must be a non-empty string and storeUrl must be a valid URL" }, { status: 400 });
     }
 
     const discovery = await discoverFeedFromStoreUrl(storeUrl);
@@ -82,7 +95,7 @@ export async function POST(request: NextRequest) {
 
   if (action === "delete_dead_source") {
     const { url } = body;
-    if (!url) return NextResponse.json({ error: "url required" }, { status: 400 });
+    if (!isValidUrl(url)) return NextResponse.json({ error: "url must be a valid URL" }, { status: 400 });
     await removeMasterSource(url);
     if (hasTurso()) await deleteFeedSuggestion(url);
     const sources = await listMasterSources();
@@ -92,8 +105,11 @@ export async function POST(request: NextRequest) {
 
   if (action === "approve_suggestion") {
     const { oldUrl, newUrl, newWebsite, name } = body;
-    if (!oldUrl || !newUrl || !name) {
-      return NextResponse.json({ error: "oldUrl, newUrl, and name are required" }, { status: 400 });
+    if (!isValidUrl(oldUrl) || !isValidUrl(newUrl) || !isNonEmptyString(name)) {
+      return NextResponse.json({ error: "oldUrl and newUrl must be valid URLs, name must be a non-empty string" }, { status: 400 });
+    }
+    if (newWebsite !== undefined && !isValidUrl(newWebsite)) {
+      return NextResponse.json({ error: "newWebsite must be a valid URL if provided" }, { status: 400 });
     }
     await addOrUpdateMasterSource({
       name,
@@ -114,7 +130,7 @@ export async function POST(request: NextRequest) {
 
   if (action === "dismiss_suggestion") {
     const { oldUrl } = body;
-    if (!oldUrl) return NextResponse.json({ error: "oldUrl required" }, { status: 400 });
+    if (!isValidUrl(oldUrl)) return NextResponse.json({ error: "oldUrl must be a valid URL" }, { status: 400 });
     if (hasTurso()) await deleteFeedSuggestion(oldUrl);
     const suggestions = hasTurso() ? await listFeedSuggestions() : [];
     return NextResponse.json({ suggestions });
@@ -123,17 +139,26 @@ export async function POST(request: NextRequest) {
   switch (action) {
     case "add": {
       const { name, url, website } = body;
-      if (!name || !url) {
-        return NextResponse.json({ error: "Name and URL are required" }, { status: 400 });
+      if (!isNonEmptyString(name) || !isValidUrl(url)) {
+        return NextResponse.json({ error: "name must be a non-empty string and url must be a valid URL" }, { status: 400 });
+      }
+      if (website !== undefined && !isValidUrl(website)) {
+        return NextResponse.json({ error: "website must be a valid URL if provided" }, { status: 400 });
       }
       const sources = await addOrUpdateMasterSource({ name, url, website: website || url, enabled: true });
       return NextResponse.json({ sources });
     }
     case "remove": {
+      if (!isValidUrl(body.url)) {
+        return NextResponse.json({ error: "url must be a valid URL" }, { status: 400 });
+      }
       const sources = await removeMasterSource(body.url);
       return NextResponse.json({ sources });
     }
     case "toggle": {
+      if (!isValidUrl(body.url)) {
+        return NextResponse.json({ error: "url must be a valid URL" }, { status: 400 });
+      }
       const sources = await toggleMasterSource(body.url);
       return NextResponse.json({ sources });
     }

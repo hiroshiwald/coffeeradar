@@ -8,8 +8,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { username, password } = body;
 
-  if (!username || !password) {
-    return NextResponse.json({ error: "Username and password are required." }, { status: 400 });
+  if (typeof username !== "string" || !username.trim() || typeof password !== "string" || !password.trim()) {
+    return NextResponse.json({ error: "Username and password must be non-empty strings." }, { status: 400 });
   }
 
   const valid = await validateSiteUser(username, password);
