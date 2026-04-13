@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
-import { useVirtualizer, Virtualizer } from "@tanstack/react-virtual";
+import { useCallback } from "react";
 import { CoffeeEntry } from "@/lib/types";
 import { getNoteColor } from "@/lib/noteColors";
 import { timeAgo } from "@/lib/formatters";
@@ -11,62 +10,6 @@ import { useCoffeeFilters } from "./coffee-table/useCoffeeFilters";
 import CoffeeTableFilters from "./coffee-table/CoffeeTableFilters";
 import CoffeeTableHeader from "./coffee-table/CoffeeTableHeader";
 import CoffeeTableRow from "./coffee-table/CoffeeTableRow";
-
-const SPACER_STYLE = { padding: 0, border: "none" } as const;
-
-function VirtualizedBody({
-  loading,
-  filtered,
-  virtualizer,
-  onSelectNote,
-}: {
-  loading: boolean;
-  filtered: CoffeeEntry[];
-  virtualizer: Virtualizer<HTMLDivElement, Element>;
-  onSelectNote: (note: string) => void;
-}) {
-  if (loading) {
-    return (
-      <tbody className="divide-y divide-gray-100 dark:divide-gray-800/50">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <tr key={i}>
-            {Array.from({ length: 8 }).map((_, j) => (
-              <td key={j} className="px-4 py-3">
-                <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    );
-  }
-
-  if (filtered.length === 0) {
-    return (
-      <tbody>
-        <tr>
-          <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
-            No coffees match your filters.
-          </td>
-        </tr>
-      </tbody>
-    );
-  }
-
-  const items = virtualizer.getVirtualItems();
-  const paddingTop = items[0]?.start ?? 0;
-  const paddingBottom = virtualizer.getTotalSize() - (items[items.length - 1]?.end ?? 0);
-
-  return (
-    <tbody className="divide-y divide-gray-100 dark:divide-gray-800/50">
-      {paddingTop > 0 && <tr><td colSpan={8} style={{ height: paddingTop, ...SPACER_STYLE }} /></tr>}
-      {items.map((vi) => (
-        <CoffeeTableRow key={filtered[vi.index].id} coffee={filtered[vi.index]} onSelectNote={onSelectNote} />
-      ))}
-      {paddingBottom > 0 && <tr><td colSpan={8} style={{ height: paddingBottom, ...SPACER_STYLE }} /></tr>}
-    </tbody>
-  );
-}
 
 export default function CoffeeTable() {
   const { data, loading, refresh } = useCoffeeData();
@@ -85,18 +28,6 @@ export default function CoffeeTable() {
   } = useCoffeeFilters(data?.coffees);
 
   const onSelectNote = useCallback((note: string) => setFilterNote(note), [setFilterNote]);
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const rowVirtualizer = useVirtualizer({
-    count: filtered.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 56,
-    overscan: 10,
-  });
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 });
-  }, [filters.search, filters.filterType, filters.filterProcess, filters.filterNote, filters.showMerch, sortKey, sortDir]);
 
   const meta = data?.meta;
   const merchCount = data ? data.coffees.filter((c) => c.isMerch).length : 0;
@@ -162,19 +93,32 @@ export default function CoffeeTable() {
         </div>
       )}
 
-      <div
-        ref={scrollRef}
-        className="overflow-auto rounded-xl border border-gray-200 dark:border-gray-800"
-        style={{ maxHeight: "max(400px, calc(100vh - 280px))" }}
-      >
-        <table className="w-full text-sm [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
+        <table className="w-full text-sm">
           <CoffeeTableHeader sortKey={sortKey} sortDir={sortDir} onToggleSort={toggleSort} />
-          <VirtualizedBody
-            loading={loading && !data}
-            filtered={filtered}
-            virtualizer={rowVirtualizer}
-            onSelectNote={onSelectNote}
-          />
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800/50">
+            {loading && !data ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: 8 }).map((_, j) => (
+                    <td key={j} className="px-4 py-3">
+                      <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+                  No coffees match your filters.
+                </td>
+              </tr>
+            ) : (
+              filtered.map((c: CoffeeEntry) => (
+                <CoffeeTableRow key={c.id} coffee={c} onSelectNote={onSelectNote} />
+              ))
+            )}
+          </tbody>
         </table>
       </div>
 
