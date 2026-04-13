@@ -126,3 +126,9 @@
 - `src/components/coffee-table/CoffeeTableHeader.tsx`: moved `bg-gray-50` back to `<tr>`, removed from individual `<th>` elements
 - Removed `@tanstack/react-virtual` dependency from `package.json`
 - CoffeeTableRow memoization (`React.memo`) and `content-visibility: auto` remain intact from earlier commits
+
+### 2026-04-13
+- Replaced batched-sequential feed fetching with sliding concurrency window in `src/lib/feedFetcher.ts`
+- Added `fetchWithPool` helper (worker-pool pattern); replaced for-loop + `Promise.all` batches in `fetchAllFeeds()`
+- Keeps exactly `FEED_CONCURRENCY` requests in flight; next feed starts the instant any single one completes
+- No signature, return type, or dependency changes; all 5 feedFetcher tests pass
