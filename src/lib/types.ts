@@ -36,3 +36,19 @@ export interface ApiResponse {
     isFallback: boolean;
   };
 }
+
+export type FilterMode = "all" | "healthy" | "failed" | "unknown";
+
+export interface SiteUserInfo {
+  username: string;
+  createdAt: string;
+}
+
+export interface FeedSuggestion {
+  sourceUrl: string;
+  suggestedFeedUrl: string | null;
+  suggestedWebsite: string | null;
+  preflightOk: boolean;
+  reason: string | null;
+  checkedAt: string;
+}
