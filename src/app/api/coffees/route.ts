@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hasTurso, initDb, getCoffees, getFeedHealth, upsertCoffees, saveFeedHealth } from "@/lib/db";
+import { hasTurso, initDb, getCoffees, getFeedHealth, upsertCoffees, saveFeedHealth, cleanOldData } from "@/lib/db";
 import { fetchAllFeeds } from "@/lib/feedFetcher";
 import { FALLBACK_COFFEES } from "@/lib/fallback";
 import { ApiResponse } from "@/lib/types";
@@ -60,6 +60,7 @@ async function handleWithDb(forceRefresh: boolean): Promise<NextResponse> {
         if (fetched.length > 0) {
           await upsertCoffees(fetched);
           await saveFeedHealth(healthy, failed, total);
+          await cleanOldData();
         }
       });
       return NextResponse.json(response);
