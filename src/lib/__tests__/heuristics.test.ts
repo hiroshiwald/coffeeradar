@@ -110,9 +110,10 @@ describe("extractNotes", () => {
     expect(notes).toEqual([]);
   });
 
-  it("extracts subword flavors inside an explicit segment", () => {
+  it("extracts multi-word flavors inside an explicit segment", () => {
     const notes = extractNotes("Tasting notes: dark chocolate, brown sugar", []);
-    expect(notes).toContain("Chocolate");
+    expect(notes).toContain("Dark Chocolate");
+    expect(notes).toContain("Brown Sugar");
   });
 
   it("caps results at 6 notes", () => {
