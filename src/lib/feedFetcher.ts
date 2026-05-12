@@ -4,6 +4,7 @@ import { listEnabledMasterSources } from "./sourceStore";
 import { FEED_CONCURRENCY, FEED_TIMEOUT_MS } from "./constants";
 import { logger } from "./logger";
 import { hasTurso, getFeedHttpMeta, type FeedHttpMeta } from "./db";
+import { extractNotes } from "./heuristics";
 
 export interface FeedResult {
   url: string;
@@ -60,6 +61,41 @@ async function fetchOne(source: FetchTarget, meta?: FeedHttpMeta): Promise<Fetch
     const resEtag = res.headers.get("ETag") ?? undefined;
     const xml = await res.text();
     const entries = parseFeed(xml, source.name, source.website);
+
+    // Fallback: If any entry is completely missing tasting notes,
+    // do a quick best-effort scrape of its product page HTML.
+    const needsNotes = entries.filter((e) => e.tastingNotes.length === 0);
+    const toScrape = needsNotes.slice(0, 5); // cap at 5 per feed to avoid timeouts
+
+    if (toScrape.length > 0) {
+      await Promise.all(
+        toScrape.map(async (entry) => {
+          try {
+            const abortController = new AbortController();
+            const fetchTimeout = setTimeout(() => abortController.abort(), 3000);
+            const htmlRes = await fetch(entry.link, {
+              signal: abortController.signal,
+              headers: { "User-Agent": "CoffeeRadar/1.0" },
+              cache: "no-store",
+            });
+            clearTimeout(fetchTimeout);
+
+            if (htmlRes.ok) {
+              const html = await htmlRes.text();
+              const text = html.replace(/<[^>]+>/g, " ");
+              const discoveredNotes = extractNotes(text, []);
+              if (discoveredNotes.length > 0) {
+                entry.tastingNotes = discoveredNotes;
+              }
+            }
+          } catch (e) {
+            // Silently ignore scrape errors (timeout, network, etc)
+            // Fallback is best-effort.
+          }
+        })
+      );
+    }
+
     return { entries, ok: entries.length > 0, lastModified: resLastModified, etag: resEtag };
   } catch (err) {
     logger.warn(`[fetchOne] ${source.name} (${source.url}) failed`, err);

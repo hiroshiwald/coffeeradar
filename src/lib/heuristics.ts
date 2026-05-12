@@ -51,7 +51,7 @@ export function tokenizeNotesSegment(segment: string): string[] {
 
 // Drop tokens that aren't useful as note candidates (too short/long).
 export function filterNoiseTokens(tokens: string[]): string[] {
-  return tokens.filter((t) => t.length > 1 && t.length < 30);
+  return tokens.filter((t) => t.length > 1 && t.length < 150);
 }
 
 // Title-case a note for display ("brown sugar" -> "Brown Sugar").
@@ -80,10 +80,15 @@ function collectNotesFromPatterns(lower: string, found: Set<string>): void {
           continue;
         }
         // Within an explicit tasting-notes segment only, allow whole-word
-        // subword matches so "dark chocolate" yields "Chocolate". Never run
-        // this against arbitrary body copy.
-        for (const sub of cleaned.split(/\s+/)) {
-          if (NOTE_WORDS.has(sub)) found.add(normalizeNoteCase(sub));
+        // subword matches so "dark chocolate" yields "Chocolate" and
+        // "wildflower honey" yields "Honey". Never run this against arbitrary body copy.
+        for (const word of NOTE_WORDS) {
+          // Escape the word to handle any special characters in NOTE_WORDS (though unlikely)
+          const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`\\b${escapedWord}\\b`, "i");
+          if (regex.test(cleaned)) {
+            found.add(normalizeNoteCase(word));
+          }
         }
       }
     }

@@ -39,6 +39,7 @@ export const NOTE_PATTERNS: readonly RegExp[] = [
   /cupping\s*(?:notes?|score)?\s*(?:of|:|-)\s*([^.<\n]+)/gi,
   /we\s*taste\s*([^.<\n]+)/gi,
   /expect\s*([^.<\n]+)/gi,
+  /similar\s*to\s*([^.<\n]+)/gi,
 ];
 
 export const NOTE_WORDS: ReadonlySet<string> = new Set([
