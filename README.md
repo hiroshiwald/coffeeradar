@@ -310,4 +310,5 @@ This cleanup is run during cron refresh and manual refresh flows.
 ## Current limitations / future improvements
 
 - Feed parsing quality can vary across non-standard source formats.
+- Some roasters (like Methodical) do not include full descriptions in their XML feeds; for these cases, the `feedFetcher` initiates a best-effort HTML fallback scrape (capped at 5 requests per feed) to extract missing tasting notes from the product page.
 - Additional source-specific adapters and quality metrics are planned (see `docs/feed-data-quality-plan.md`).
