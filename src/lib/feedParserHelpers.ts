@@ -10,6 +10,16 @@ export function decodeHtml(s: string): string {
     .replace(/&amp;/g, "&");
 }
 
+// Remove HTML tags so downstream text heuristics (extractNotes, detectType,
+// detectProcess) see only the visible prose. Shopify feeds wrap field
+// labels like "Tasting Notes:" in <strong>...</strong>, which causes the
+// pattern capture in heuristics.ts to fail at the closing < boundary.
+// Used only on text destined for the heuristic layer — image extraction
+// still operates on the raw HTML to find <img src=...> attributes.
+export function stripHtml(s: string): string {
+  return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 export function deepString(val: unknown): string {
   if (!val) return "";
   if (typeof val === "string") return val;

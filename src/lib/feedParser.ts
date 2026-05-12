@@ -8,6 +8,7 @@ import {
   extractProductType,
   extractShopifyPrice,
   extractShopifyTags,
+  stripHtml,
 } from "./feedParserHelpers";
 import { logger } from "./logger";
 
@@ -60,7 +61,9 @@ export function parseAtomFeed(xml: string, roaster: string, website: string): Co
 
       const shopifyTags = extractShopifyTags(e);
       const productType = extractProductType(e);
-      const allText = `${title} ${summary} ${content} ${encoded} ${shopifyTags.join(" ")} ${productType}`;
+      const allText = stripHtml(
+        `${title} ${summary} ${content} ${encoded} ${shopifyTags.join(" ")} ${productType}`,
+      );
 
       const price = extractShopifyPrice(e, allText, extractPrice);
       const link = resolveAtomLink(e.link, website);
@@ -100,7 +103,9 @@ export function parseRssFeed(xml: string, roaster: string, website: string): Cof
       const title = deepText(item.title);
       const desc = deepText(item.description);
       const encoded = deepText(item["content:encoded"]);
-      const allText = `${title} ${desc} ${encoded} ${deepText(item["g:price"])} ${deepText(item.price)}`;
+      const allText = stripHtml(
+        `${title} ${desc} ${encoded} ${deepText(item["g:price"])} ${deepText(item.price)}`,
+      );
 
       let imageUrl = "";
       const enclosure = item.enclosure as Record<string, unknown> | undefined;
