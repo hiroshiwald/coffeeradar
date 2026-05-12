@@ -806,3 +806,10 @@ never returns them.
 - **Problem**: `cleanOldData()` only ran in `/api/cron`; manual refresh via `?refresh=true` on `/api/coffees` never pruned stale entries, so old data lingered until the next daily cron run
 - **Changed**: `src/app/api/coffees/route.ts` — added `cleanOldData` import from `@/lib/db` and `await cleanOldData()` call inside `handleWithDb`'s `scheduleBackground` callback, after `saveFeedHealth`
 - No changes to `handleWithoutDb`, cron route, or `cleanOldData` itself
+
+### 2026-05-11 — Fix tasting notes missing from Sump and Methodical
+- **Root cause 1**: `heuristics.ts` noise filter was stripping any tokens longer than 30 characters, causing long descriptive strings from Sump to be discarded before note extraction. Furthermore, exact subword matching prevented multi-word notes like "dark chocolate" and "wildflower honey" from being detected.
+- **Changed 1**: Increased noise filter max length to 150. Updated regex subword extraction to boundary match against `NOTE_WORDS` to correctly identify multi-word flavors within explicitly parsed `We Taste:` blocks. Added `/similar\s*to\s*([^.<\n]+)/gi` to the heuristic pattern to catch notes across sentences.
+- **Root cause 2**: Methodical Coffee's Shopify XML feed completely omitted the product description (and the corresponding "We Taste" descriptors).
+- **Changed 2**: Removed the previously attempted HTML fallback scraping in `src/lib/feedFetcher.ts`. While it fixed the Methodical issue, it caused 82+ simultaneous fetch failures and serverless timeouts by spawning a massive fan-out of network requests. We are reverting to relying purely on the feed XML in accordance with the prime directive. Methodical's empty description will remain empty.
+- All vitest test suites verified passing with updated heuristic coverage.

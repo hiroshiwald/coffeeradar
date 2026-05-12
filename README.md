@@ -310,4 +310,5 @@ This cleanup is run during cron refresh and manual refresh flows.
 ## Current limitations / future improvements
 
 - Feed parsing quality can vary across non-standard source formats.
+- Some roasters (like Methodical) do not include full descriptions in their XML feeds. In these cases, the app relies purely on the XML output and leaves the description/notes blank to prevent aggressive serverless timeout failures.
 - Additional source-specific adapters and quality metrics are planned (see `docs/feed-data-quality-plan.md`).
