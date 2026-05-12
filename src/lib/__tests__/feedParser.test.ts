@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseFeed, parseAtomFeed, parseRssFeed } from "../feedParser";
+import { THEORY_TASTING_NOTES_ATOM } from "./fixtures/realFeedSamples";
 
 const MINIMAL_ATOM = `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
@@ -89,6 +90,26 @@ describe("parseRssFeed", () => {
   it("returns empty array for malformed RSS", () => {
     expect(parseRssFeed("garbage", "R", "https://x.com")).toEqual([]);
     expect(parseRssFeed("<rss><channel></channel></rss>", "R", "https://x.com")).toEqual([]);
+  });
+});
+
+describe("parseAtomFeed against real Shopify CDATA", () => {
+  // Regression: prior to the stripHtml step in feedParser.ts, the
+  // <strong>Tasting Notes:</strong> wrapper made the note-capture regex
+  // fail because [^.<\n]+ required ≥1 non-< char immediately after the
+  // colon, and the next char was always < (start of </strong>).
+  it("extracts notes from Theory's <strong>-wrapped Tasting Notes label", () => {
+    const entries = parseAtomFeed(
+      THEORY_TASTING_NOTES_ATOM,
+      "Theory Coffee Roasters",
+      "https://theorycoffee.com",
+    );
+    expect(entries).toHaveLength(1);
+    const notes = entries[0].tastingNotes;
+    expect(notes).toContain("Lemon");
+    expect(notes).toContain("Rose");
+    expect(notes).toContain("Jasmine");
+    expect(notes).toContain("Raspberry");
   });
 });
 

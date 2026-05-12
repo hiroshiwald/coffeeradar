@@ -8,6 +8,7 @@ import {
   extractProductType,
   extractShopifyPrice,
   extractShopifyTags,
+  stripHtml,
 } from "../feedParserHelpers";
 import { extractPrice } from "../heuristics";
 
@@ -17,6 +18,29 @@ describe("decodeHtml", () => {
     expect(decodeHtml("Tom &amp; Jerry")).toBe("Tom & Jerry");
     expect(decodeHtml("&quot;hi&quot;")).toBe('"hi"');
     expect(decodeHtml("it&#39;s")).toBe("it's");
+  });
+});
+
+describe("stripHtml", () => {
+  it("removes tags and collapses whitespace", () => {
+    expect(stripHtml("<strong>Tasting Notes:</strong> Lemon, Rose"))
+      .toBe("Tasting Notes: Lemon, Rose");
+  });
+
+  it("turns adjacent tags into single space", () => {
+    expect(stripHtml("<p>a</p><p>b</p>")).toBe("a b");
+  });
+
+  it("is a no-op on plain text", () => {
+    expect(stripHtml("Tasting notes: chocolate")).toBe("Tasting notes: chocolate");
+  });
+
+  it("handles self-closing and attribute-heavy tags", () => {
+    expect(stripHtml('foo<br/>bar<img src="x.jpg" />baz')).toBe("foo bar baz");
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(stripHtml("")).toBe("");
   });
 });
 
