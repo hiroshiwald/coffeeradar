@@ -20,7 +20,7 @@ const MINIMAL_RSS = `<?xml version="1.0" encoding="UTF-8"?>
       <title>Colombia Huila Natural</title>
       <link>https://example.com/products/colombia</link>
       <pubDate>Sat, 01 Mar 2026 00:00:00 GMT</pubDate>
-      <description>Tasting notes: chocolate and cherry</description>
+      <description>Rich chocolate and cherry notes</description>
     </item>
   </channel>
 </rss>`;

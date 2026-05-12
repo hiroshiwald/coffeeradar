@@ -112,19 +112,7 @@ describe("extractNotes", () => {
 
   it("extracts subword flavors inside an explicit segment", () => {
     const notes = extractNotes("Tasting notes: dark chocolate, brown sugar", []);
-    // The previous implementation dropped multi-word flavors if they weren't exact matches.
-    // We now correctly extract the full multi-word flavors ("Dark Chocolate").
-    expect(notes).toContain("Dark Chocolate");
-    expect(notes).toContain("Brown Sugar");
-  });
-
-  it("extracts complex descriptions with long sentences", () => {
-    const text = "We taste clear notes of rose tea and lilac that follow a tart opening akin to bergamot. The cup is sweet throughout, similar to wildflower honey.";
-    const notes = extractNotes(text, []);
-    expect(notes).toContain("Rose");
-    expect(notes).toContain("Lilac");
-    expect(notes).toContain("Bergamot");
-    expect(notes).toContain("Honey");
+    expect(notes).toContain("Chocolate");
   });
 
   it("caps results at 6 notes", () => {

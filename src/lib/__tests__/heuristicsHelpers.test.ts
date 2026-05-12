@@ -37,7 +37,7 @@ describe("tokenizeNotesSegment", () => {
 
 describe("filterNoiseTokens", () => {
   it("drops too-short and too-long tokens", () => {
-    const tokens = ["a", "ok", "x".repeat(151), "fine"];
+    const tokens = ["a", "ok", "x".repeat(31), "fine"];
     expect(filterNoiseTokens(tokens)).toEqual(["ok", "fine"]);
   });
 });
