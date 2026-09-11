@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { chunkedBatchInsert } from "../db";
+import { chunkedBatchInsert, DEDUPE_COFFEES_SQL } from "../db";
+import { createClient } from "@libsql/client";
 import type { Client } from "@libsql/client/web";
 
 function makeFakeClient() {
@@ -57,5 +58,87 @@ describe("chunkedBatchInsert", () => {
     await expect(
       chunkedBatchInsert(failing, sql, [1, 2], (n) => [n]),
     ).rejects.toThrow("boom");
+  });
+});
+
+// Runs the production dedupe statement against a real in-memory SQLite so the
+// grouping semantics are tested, not just the SQL text. The table mirrors the
+// columns DEDUPE_COFFEES_SQL reads.
+describe("DEDUPE_COFFEES_SQL", () => {
+  async function makeDb() {
+    const db = createClient({ url: "file::memory:" });
+    await db.execute(
+      `CREATE TABLE coffees (
+        id TEXT PRIMARY KEY,
+        roaster TEXT NOT NULL,
+        coffee TEXT NOT NULL,
+        link TEXT DEFAULT '',
+        date TEXT NOT NULL
+      )`,
+    );
+    return db;
+  }
+
+  async function insert(
+    db: Awaited<ReturnType<typeof makeDb>>,
+    rows: Array<[string, string, string, string, string]>,
+  ) {
+    for (const args of rows) {
+      await db.execute({ sql: `INSERT INTO coffees VALUES (?, ?, ?, ?, ?)`, args });
+    }
+  }
+
+  async function roasters(db: Awaited<ReturnType<typeof makeDb>>) {
+    const res = await db.execute(`SELECT roaster FROM coffees ORDER BY rowid`);
+    return res.rows.map((r) => String(r.roaster));
+  }
+
+  it("keeps the renamed row and drops the pre-rename duplicate", async () => {
+    const db = await makeDb();
+    await insert(db, [
+      ["old-id", "Shop Coffee - Resident Coffee Roasters", "Kenya Kiriga AA", "https://resident.coffee/p/1", "2026-09-01"],
+      ["new-id", "Resident Coffee Roasters", "Kenya Kiriga AA", "https://resident.coffee/p/1", "2026-09-01"],
+    ]);
+
+    const result = await db.execute(DEDUPE_COFFEES_SQL);
+
+    expect(result.rowsAffected).toBe(1);
+    expect(await roasters(db)).toEqual(["Resident Coffee Roasters"]);
+  });
+
+  it("keeps coffees that share a name across roasters", async () => {
+    const db = await makeDb();
+    await insert(db, [
+      ["a", "Sey Coffee", "Ethiopia Yirgacheffe", "https://seycoffee.com/p/1", "2026-09-01"],
+      ["b", "Luna Coffee", "Ethiopia Yirgacheffe", "https://lunacoffee.ca/p/1", "2026-09-01"],
+    ]);
+
+    const result = await db.execute(DEDUPE_COFFEES_SQL);
+
+    expect(result.rowsAffected).toBe(0);
+    expect(await roasters(db)).toEqual(["Sey Coffee", "Luna Coffee"]);
+  });
+
+  it("keeps separate releases of the same coffee on different dates", async () => {
+    const db = await makeDb();
+    await insert(db, [
+      ["a", "Luna Coffee", "Colombia Wilder Lasso", "https://lunacoffee.ca/p/1", "2026-08-01"],
+      ["b", "Luna Coffee", "Colombia Wilder Lasso", "https://lunacoffee.ca/p/1", "2026-09-01"],
+    ]);
+
+    const result = await db.execute(DEDUPE_COFFEES_SQL);
+
+    expect(result.rowsAffected).toBe(0);
+  });
+
+  it("is a no-op on an already clean table", async () => {
+    const db = await makeDb();
+    await insert(db, [
+      ["a", "Luna Coffee", "Kenya Kiriga AA", "https://lunacoffee.ca/p/1", "2026-09-01"],
+    ]);
+
+    const result = await db.execute(DEDUPE_COFFEES_SQL);
+
+    expect(result.rowsAffected).toBe(0);
   });
 });
