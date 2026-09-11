@@ -187,3 +187,34 @@ export function extractShopifyPrice(
 
   return parsePrice(allText);
 }
+
+// Product link for one feed entry, always on the roaster's own domain.
+//
+// Callers depend on this being roaster-specific: buildStableId() hashes the
+// link into the coffee id, and cleanDuplicateCoffees() groups rows by it. An
+// empty or shared link therefore makes two roasters' coffees collide — one
+// overwrites the other on insert, or the dedupe pass deletes it.
+//
+// Feeds supply link as a bare string, an object carrying @_href, an array of
+// either, or an empty element. Anything that is not a usable http(s) URL falls
+// back to the source website, which is unique per roaster.
+export function resolveLink(raw: unknown, website: string): string {
+  const direct = hrefOf(raw);
+  if (direct) return direct;
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const href = hrefOf(item);
+      if (href) return href;
+    }
+  }
+  return website;
+}
+
+function hrefOf(val: unknown): string {
+  if (typeof val === "string") return val.startsWith("http") ? val : "";
+  if (typeof val === "object" && val !== null) {
+    const href = (val as Record<string, unknown>)["@_href"];
+    if (typeof href === "string" && href.startsWith("http")) return href;
+  }
+  return "";
+}

@@ -167,3 +167,54 @@ describe("stable IDs", () => {
     expect(a[0].id).not.toBe(b[0].id);
   });
 });
+
+// A feed that omits a usable per-entry link must not yield a link that another
+// roaster's feed could also produce: buildStableId hashes the link into the
+// coffee id, and cleanDuplicateCoffees groups rows by it.
+const EMPTY_LINK_RSS = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test Roaster</title>
+    <item>
+      <title>Ethiopia Yirgacheffe</title>
+      <link></link>
+      <pubDate>not a date</pubDate>
+      <description>Tasting notes: chocolate</description>
+    </item>
+  </channel>
+</rss>`;
+
+const EMPTY_LINK_ATOM = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Test Roaster</title>
+  <entry>
+    <title>Ethiopia Yirgacheffe</title>
+    <link href="" />
+    <published>not a date</published>
+    <summary>Tasting notes: chocolate</summary>
+  </entry>
+</feed>`;
+
+describe("link fallback keeps entries roaster-specific", () => {
+  it("falls back to the website when an RSS link element is empty", () => {
+    const [entry] = parseRssFeed(EMPTY_LINK_RSS, "Aka Coffee", "https://aka.coffee");
+    expect(entry.link).toBe("https://aka.coffee");
+  });
+
+  it("falls back to the website when an Atom href is empty", () => {
+    const [entry] = parseAtomFeed(EMPTY_LINK_ATOM, "Aka Coffee", "https://aka.coffee");
+    expect(entry.link).toBe("https://aka.coffee");
+  });
+
+  it("gives two roasters distinct ids and links for an identical linkless entry", () => {
+    const [a] = parseRssFeed(EMPTY_LINK_RSS, "Aka Coffee", "https://aka.coffee");
+    const [b] = parseRssFeed(EMPTY_LINK_RSS, "Luna Coffee", "https://lunacoffee.ca");
+
+    // Same title, same unparseable date, no link. Before the fallback existed
+    // both produced link "" and collided in the dedupe GROUP BY.
+    expect(a.coffee).toBe(b.coffee);
+    expect(a.date).toBe(b.date);
+    expect(a.link).not.toBe(b.link);
+    expect(a.id).not.toBe(b.id);
+  });
+});
