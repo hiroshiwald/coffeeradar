@@ -10,6 +10,7 @@ import { useCoffeeFilters } from "./coffee-table/useCoffeeFilters";
 import CoffeeTableFilters from "./coffee-table/CoffeeTableFilters";
 import CoffeeTableHeader from "./coffee-table/CoffeeTableHeader";
 import CoffeeTableRow from "./coffee-table/CoffeeTableRow";
+import Footer from "./Footer";
 
 export default function CoffeeTable() {
   const { data, loading, refresh, isBackgroundRefreshing } = useCoffeeData();
@@ -140,7 +141,7 @@ export default function CoffeeTable() {
         </div>
       )}
 
-      <p className="text-center text-xs text-gray-300 dark:text-gray-700 mt-10">CoffeeRadar v1</p>
+      <Footer />
     </div>
   );
 }

@@ -152,6 +152,7 @@ SESSION_SECRET=          # Random string, min 32 chars (required in production)
 # Optional
 SITE_PROTECTION_ENABLED= # Set to "false" to explicitly disable site protection
 CRON_SECRET=             # Protect /api/cron with bearer auth
+NEXT_PUBLIC_TIP_URL=     # https URL for the footer tip link
 
 # Database (optional — app works without Turso in local/dev mode)
 TURSO_DATABASE_URL=
@@ -164,6 +165,8 @@ TURSO_AUTH_TOKEN=
 - If `OWNER_USERNAME` / `OWNER_PASSWORD` are missing, owner/admin routes return `503`.
 - If `SESSION_SECRET` is missing in production, the app throws an error (fail-closed).
 - If Turso is not configured, app still works in local mode with in-memory fallback.
+- `NEXT_PUBLIC_TIP_URL` adds a tip link to the footer. The value must use https, or the
+  line is hidden. Leave it unset to show no tip link at all.
 
 ---
 
