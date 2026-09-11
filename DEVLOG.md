@@ -898,3 +898,9 @@ An 8-lens adversarial review raised 32 findings; each went to 3 independent skep
 **Tests**: `npm test` 247/247 (was 241). `npx tsc --noEmit` and `npm run build` clean. Browser pass: 11 checks covering aria-expanded round-tripping, unique letter ids, every nav anchor resolving, and the failed-fetch subtitle never claiming a count.
 
 **Gotcha**: two of my own browser assertions failed first time and both were the test's fault, not the code's. One used roaster `"Luna"` where the source is `"Luna Coffee"` — the join is exact after normalizing, which is intended. The other expected 2 active roasters while `Blueprint Coffee` is registered twice and so matches twice. Check fixture names against `data/sources.json` before believing a count assertion.
+
+### 2026-09-11 — Rename Seth Taylor: Coffee By Design
+- **Changed**: `data/sources.json` — `Seth Taylor: Coffee By Design` to `Seth Taylor`. One `name` field; 310 entries, no `url` or `website` touched.
+- **Why**: the feed is on sethtaylor.ca, and Coffee By Design is a separate roaster in Maine, so the second half was a scraped tagline rather than part of the business name. Owner confirmed.
+- **Class**: changes the lower-cased name, so the coffees it has already stored get new ids and the old rows clear on the next `cleanOldData()` run. This is the 33rd rename; 32 landed earlier today.
+- `npm test` 247/247, `npx tsc --noEmit` clean.
