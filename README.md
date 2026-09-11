@@ -211,6 +211,10 @@ Current suites in `src/lib/__tests__/`:
 - `sourceStore.test.ts` — `initDb` memoization
 - `siteAuth.test.ts` — `isAuthData` type guard
 - `roasterSummary.test.ts` — Source-to-coffee join, active count, letter grouping
+- `feedTriage.test.ts` — Two-step triage for failed feeds
+- `feedValidator.test.ts` — Feed URL validation
+- `feedSuggestion.test.ts` — Feed replacement suggestions
+- `feedParserHelpers.test.ts` — Link resolution and pure extraction helpers
 - `tipUrl.test.ts` — Tip URL validation
 
 ---

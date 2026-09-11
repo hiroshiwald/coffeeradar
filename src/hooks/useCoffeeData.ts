@@ -21,6 +21,11 @@ export function useCoffeeData() {
         window.location.href = "/login";
         return;
       }
+      // Without this a 4xx/5xx body is parsed and stored as if it were data.
+      // Callers then read a malformed payload as a real result: an empty object
+      // makes `data` truthy while `data.coffees` is undefined.
+      if (!res.ok) throw new Error(`/api/coffees responded ${res.status}`);
+
       const json: ApiResponse = await res.json();
       setData(json);
 
