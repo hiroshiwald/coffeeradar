@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { timeAgo, formatDate } from "../formatters";
+import { timeAgo, formatDate, formatHostname } from "../formatters";
 
 describe("timeAgo", () => {
   beforeEach(() => {
@@ -38,5 +38,27 @@ describe("formatDate", () => {
     // verify it doesn't throw.
     const result = formatDate("not-a-date");
     expect(typeof result).toBe("string");
+  });
+});
+
+describe("formatHostname", () => {
+  it("strips the www prefix", () => {
+    expect(formatHostname("https://www.seycoffee.com/collections/all")).toBe("seycoffee.com");
+  });
+
+  it("keeps a host that has no www", () => {
+    expect(formatHostname("https://aka.coffee/collections/all")).toBe("aka.coffee");
+  });
+
+  it("keeps a subdomain that is not www", () => {
+    expect(formatHostname("https://shop.bonanzacoffee.de/x")).toBe("shop.bonanzacoffee.de");
+  });
+
+  it("returns an empty string for an unparseable url", () => {
+    expect(formatHostname("not a url")).toBe("");
+  });
+
+  it("returns an empty string for an empty value", () => {
+    expect(formatHostname("")).toBe("");
   });
 });

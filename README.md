@@ -109,6 +109,7 @@ The owner credentials always work as a fallback login. Site users are stored in 
 ### Public (protected when `OWNER_PASSWORD` is set)
 
 - `GET /` — Main CoffeeRadar page.
+- `GET /roasters` — A–Z roaster index with per-roaster coffee panels.
 - `GET /api/coffees` — Returns cached/persisted coffee entries + health metadata.
   - Query `?refresh=true` forces a feed refresh.
 - `GET /api/sources` — Returns source list and current health map.
@@ -153,6 +154,7 @@ SESSION_SECRET=          # Random string, min 32 chars (required in production)
 SITE_PROTECTION_ENABLED= # Set to "false" to explicitly disable site protection
 CRON_SECRET=             # Protect /api/cron with bearer auth
 NEXT_PUBLIC_TIP_URL=     # https URL for the footer tip link
+NEXT_PUBLIC_SUGGEST_EMAIL= # Address behind "Suggest a roaster" on /roasters
 
 # Database (optional — app works without Turso in local/dev mode)
 TURSO_DATABASE_URL=
@@ -167,6 +169,8 @@ TURSO_AUTH_TOKEN=
 - If Turso is not configured, app still works in local mode with in-memory fallback.
 - `NEXT_PUBLIC_TIP_URL` adds a tip link to the footer. The value must use https, or the
   line is hidden. Leave it unset to show no tip link at all.
+- `NEXT_PUBLIC_SUGGEST_EMAIL` adds a "Suggest a roaster" link to `/roasters`. Leave it
+  unset to hide the link. The address appears in the page source, so expect scrapers.
 
 ---
 
@@ -203,9 +207,11 @@ Current suites in `src/lib/__tests__/`:
 - `noteColors.test.ts` — Tasting note color mapping
 - `heuristics.test.ts` — Coffee type and process heuristics
 - `heuristicsHelpers.test.ts` — Tokenization, noise filtering, and case normalization
-- `db.test.ts` — `chunkedBatchInsert` helper
+- `db.test.ts` — `chunkedBatchInsert` helper, and `DEDUPE_COFFEES_SQL` against an in-memory SQLite
 - `sourceStore.test.ts` — `initDb` memoization
 - `siteAuth.test.ts` — `isAuthData` type guard
+- `roasterSummary.test.ts` — Source-to-coffee join, active count, letter grouping
+- `tipUrl.test.ts` — Tip URL validation
 
 ---
 
@@ -243,6 +249,7 @@ This cleanup is run during cron refresh and manual refresh flows.
 
 ### Pages and components
 - `src/app/page.tsx` — Home page (server component with auth guard).
+- `src/app/roasters/page.tsx` — Roasters page (server component with auth guard; loads sources and hands them to `RoasterIndex`).
 - `src/app/login/page.tsx` — Login page.
 - `src/app/owner/feeds/page.tsx` — Owner feed admin UI and site user management.
 - `src/components/CoffeeTable.tsx` — Thin orchestrator that wires the data hook to the table sub-components.
@@ -251,6 +258,10 @@ This cleanup is run during cron refresh and manual refresh flows.
 - `src/components/coffee-table/CoffeeTableHeader.tsx` — Sortable header row.
 - `src/components/coffee-table/CoffeeTableRow.tsx` — Single coffee row.
 - `src/components/ThemeToggle.tsx` — Dark/light mode toggle.
+- `src/components/Footer.tsx` — Shared footer; shows the tip link when `NEXT_PUBLIC_TIP_URL` is set.
+- `src/components/RoasterIndex.tsx` — A–Z roaster index with letter jump nav and expandable panels.
+- `src/components/roasters/LetterGroup.tsx` — One letter block of roaster names.
+- `src/components/roasters/RoasterPanel.tsx` — Expanded coffee list for one roaster.
 
 ### API routes
 - `src/app/api/coffees/route.ts` — Public coffee API (with auth guard).

@@ -14,3 +14,12 @@ export function formatDate(iso: string): string {
     return "";
   }
 }
+
+/** Display hostname for a website URL, without the www prefix. "" if unparseable. */
+export function formatHostname(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}

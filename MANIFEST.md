@@ -22,12 +22,15 @@
 | `src/lib/feedTriage.ts` | Two-step triage for failed feeds — reachability check then feed probing | `triageFailedFeed()`, `triageFailedFeeds()` |
 | `src/lib/feedValidator.ts` | Validates feed URL returns parseable XML with entries | `isValidFeedUrl()` |
 | `src/lib/coffeeFilters.ts` | Client-side filtering and sorting logic | `filterCoffees()`, `sortCoffees()`, `countNotes()` |
+| `src/lib/roasterSummary.ts` | Joins feed sources to coffees for the roasters index | `summarizeRoasters()`, `countActive()`, `groupLetter()`, `groupByLetter()` |
+| `src/lib/tipUrl.ts` | Validates the optional footer tip URL | `getTipUrl()` |
 | `src/lib/noteColors.ts` | Maps tasting note names to Tailwind color classes | `getNoteColor()` |
-| `src/lib/formatters.ts` | Date and text formatting utilities | `timeAgo()` |
+| `src/lib/formatters.ts` | Date and text formatting utilities | `timeAgo()`, `formatDate()`, `formatHostname()` |
 | `src/lib/logger.ts` | Console wrapper, silent under test | `logger` |
 | `src/lib/fallback.ts` | Demo data when feeds are unavailable | `FALLBACK_COFFEES` |
 | `src/app/page.tsx` | Home page — renders coffee table with auth guard | Server component |
 | `src/app/login/page.tsx` | Login page | Server component |
+| `src/app/roasters/page.tsx` | Roasters page — auth guard, loads sources via `listEnabledMasterSources()` | Server component |
 | `src/app/owner/feeds/page.tsx` | Admin panel orchestrator — delegates to extracted hooks and components | Client component |
 | `src/app/layout.tsx` | Root layout | Server component |
 | `src/app/api/coffees/route.ts` | Public API — serves cached coffees, optional manual refresh | `GET` handler |
@@ -38,6 +41,10 @@
 | `src/app/api/admin/sources/csv/route.ts` | Exports source list as CSV | `GET` handler |
 | `src/app/api/admin/site-auth/route.ts` | Admin user management — list, add, remove site users | `GET`, `POST` handlers |
 | `src/components/CoffeeTable.tsx` | Main UI orchestrator — data fetching, filtering, rendering | Client component |
+| `src/components/Footer.tsx` | Shared footer — version line, plus tip link when `NEXT_PUBLIC_TIP_URL` is set | Server-safe component |
+| `src/components/RoasterIndex.tsx` | A–Z roaster index — letter jump nav, expandable panels | Client component |
+| `src/components/roasters/LetterGroup.tsx` | One letter block of roaster names | Client component |
+| `src/components/roasters/RoasterPanel.tsx` | Expanded coffee list for one roaster | Client component |
 | `src/components/coffee-table/CoffeeTableFilters.tsx` | Search, type/process/note filters, merch toggle, refresh | Client component |
 | `src/components/coffee-table/CoffeeTableHeader.tsx` | Sortable table column headers | Client component |
 | `src/components/coffee-table/CoffeeTableRow.tsx` | Single coffee entry row with note color-coding | Client component |
