@@ -875,7 +875,20 @@ never returns them.
 - **Changed**: `src/lib/feedParserHelpers.ts` — new `resolveLink(raw, website)`. Accepts a string, an object with `@_href`, or an array of either; anything that is not a usable http(s) URL falls back to `website`, which is unique per roaster. `src/lib/feedParser.ts` — deleted the module-private `resolveAtomLink` and routed both `parseAtomFeed` and `parseRssFeed` through the shared helper. `src/lib/db.ts` — corrected the comment above `DEDUPE_COFFEES_SQL` to name what actually enforces the invariant, with a warning not to weaken the fallback.
 - **Tests**: 9 unit cases in `feedParserHelpers.test.ts` (empty element, missing, object with no usable href, empty `@_href`, relative and `javascript:` strings, array with nothing usable, and two roasters never sharing a fallback) plus 3 integration cases in `feedParser.test.ts` running degenerate feeds through both parsers. Verified each case fails against the old implementation before keeping it: the old RSS path returns `""`, `"[object Object]"` and `"/p/1"` for those inputs, and two roasters both get `""`.
 - **`npm test` 241/241 (was 229). `npx tsc --noEmit` clean. `npm run build` clean.**
-- **Gotcha**: entries already stored with an empty link get a new id once, so they duplicate until the old row ages out within 30 days. Those rows were already broken — an empty link renders a dead product link in the table.
+- **Migration effect, wider than first written here**: I originally recorded this as affecting only entries with an empty link. Diffing the old and new resolvers across all 11 input shapes shows **10 change behaviour** — 8 on the RSS path, 2 on Atom:
+
+| Path | Input | Old value | New value |
+|---|---|---|---|
+| RSS | object with an absolute `@_href` | `"[object Object]"` | the real product URL |
+| RSS | array of link objects | `"[object Object],[object Object]"` | the real product URL |
+| RSS | relative string (`/products/x`) | `"/products/x"` | the source website |
+| RSS | empty `<link></link>` | `""` | the source website |
+| RSS | object with no usable href | `"[object Object]"` | the source website |
+| Atom | object with a relative `@_href` | `"/products/x"` | the source website |
+| Atom | object with an empty `@_href` | `""` | the source website |
+
+  Every change is broken-to-correct, and the two `"[object Object]"` rows mean those feeds' product links never worked in the UI at all. But `buildStableId` hashes the link, so every changed link gives that coffee a new id: affected feeds insert fresh rows alongside the old ones and the coffee appears twice.
+- **Correction to what this entry first claimed**: those duplicates are **not** cleared by the next `cleanOldData()` run. `cleanDuplicateCoffees` groups on `(coffee, link, date)`, and `link` is exactly what changed, so the old and new rows land in different groups and the dedupe pass sees two distinct coffees. They clear only when the old row passes the 30-day cutoff in `cleanOldEntries`. Expect a one-time duplicate window of up to 30 days on affected feeds, not one cron cycle. Unaffected: the 213 Shopify `.atom` sources, which always emit an absolute `href`.
 - **How this was caught**: an adversarial review of the branch. Three independent lenses flagged `src/lib/db.ts` and I confirmed it by reading the parser. The original dedupe commit and its DEVLOG entry both asserted the invariant instead of checking it.
 
 ### 2026-09-11 — Act on the adversarial review of the roasters branch
@@ -904,3 +917,14 @@ An 8-lens adversarial review raised 32 findings; each went to 3 independent skep
 - **Why**: the feed is on sethtaylor.ca, and Coffee By Design is a separate roaster in Maine, so the second half was a scraped tagline rather than part of the business name. Owner confirmed.
 - **Class**: changes the lower-cased name, so the coffees it has already stored get new ids and the old rows clear on the next `cleanOldData()` run. This is the 33rd rename; 32 landed earlier today.
 - `npm test` 247/247, `npx tsc --noEmit` clean.
+
+### 2026-09-11 — Audit of this session's shared-code changes, and defer roaster-name hygiene
+- **Why**: the owner asked whether the roasters work had introduced other cascade risks like the dedupe bug, and asked that roaster-name hygiene be designed as its own module rather than bolted onto existing code.
+- **Audited**: all 19 files changed against pre-#72 `main`. Only two alter behaviour existing features depend on. Both verified empirically rather than reasoned about.
+- **`src/hooks/useCoffeeData.ts` — clean.** `if (!res.ok) throw` is shared by `CoffeeTable` and `RoasterIndex`, and only `/roasters` had ever been tested. Browser-checked the home page on both paths: 7 assertions, 0 JS errors, renders with data and survives a 500. The change removes a latent crash — `CoffeeTable.tsx:33` does `data.coffees.filter(...)`, which threw on the `{}` the old code stored from an error response.
+- **`resolveLink` — sound, but its migration effect was understated.** Corrected in the entry above: 10 of 11 input shapes change, and the resulting duplicates age out over 30 days rather than being swept by the next dedupe run.
+- **No second bug found.** No code changes in this entry; both items above are documentation.
+- **Added**: `docs/roaster-name-hygiene.md` — handoff note for a future session. Records the problem, the 33 names and 6 deliberate keeps already decided, five ruled-out approaches with the reason each fails, the owner's constraints, and the open design questions.
+- **Deferred deliberately**: no naming code this session. Three designs were proposed and two withdrawn after reading the source, which is a signal the problem needs its own session rather than a fourth attempt at the end of this one.
+- **Gotcha for whoever picks it up**: three of the obvious fixes are wrong for non-obvious reasons. Deleting the `count > 0` guard in `seedFeedSources` updates nothing, because the statement beneath it is `INSERT OR IGNORE`; and without that guard, sources deleted in `/owner/feeds` come back on the next cold start. `INSERT ... ON CONFLICT DO UPDATE` has the same resurrection problem. Details in the doc.
+- `npm test` 247/247, `npx tsc --noEmit` clean. Markdown-only changes.
