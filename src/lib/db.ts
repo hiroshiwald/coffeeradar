@@ -279,17 +279,26 @@ export async function cleanOldFeedResults(): Promise<number> {
   return result.rowsAffected;
 }
 
-export async function cleanDuplicateCoffees(): Promise<number> {
-  const db = getClient();
-  if (!db) return 0;
-  const result = await db.execute(`
+// Grouping deliberately omits `roaster`. The roaster name is hashed into every
+// coffee id (see buildStableId in feedParser.ts), so renaming a source gives its
+// coffees new ids. They insert as new rows and the old rows survive, leaving the
+// same coffee listed twice under two names until it ages out. Grouping on
+// coffee+link+date lets the next cleanup run remove the stale row. `link` is a URL
+// on the roaster's own domain (falling back to its website), so two different
+// roasters can never collide here.
+export const DEDUPE_COFFEES_SQL = `
     DELETE FROM coffees
     WHERE rowid NOT IN (
       SELECT MAX(rowid)
       FROM coffees
-      GROUP BY roaster, coffee, link, date
+      GROUP BY coffee, link, date
     )
-  `);
+  `;
+
+export async function cleanDuplicateCoffees(): Promise<number> {
+  const db = getClient();
+  if (!db) return 0;
+  const result = await db.execute(DEDUPE_COFFEES_SQL);
   return result.rowsAffected;
 }
 
