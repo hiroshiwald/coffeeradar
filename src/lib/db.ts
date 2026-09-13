@@ -283,9 +283,14 @@ export async function cleanOldFeedResults(): Promise<number> {
 // coffee id (see buildStableId in feedParser.ts), so renaming a source gives its
 // coffees new ids. They insert as new rows and the old rows survive, leaving the
 // same coffee listed twice under two names until it ages out. Grouping on
-// coffee+link+date lets the next cleanup run remove the stale row. `link` is a URL
-// on the roaster's own domain (falling back to its website), so two different
-// roasters can never collide here.
+// coffee+link+date lets the next cleanup run remove the stale row.
+//
+// This is safe only because `link` is roaster-specific, which resolveLink() in
+// feedParserHelpers.ts enforces: anything that is not a usable http(s) URL falls
+// back to the source's own website. Do not weaken that fallback. Before it
+// existed, an empty <link> element parsed to "" for every roaster, so two
+// roasters publishing a same-named coffee on the same date landed in one group
+// and this DELETE removed one of them.
 export const DEDUPE_COFFEES_SQL = `
     DELETE FROM coffees
     WHERE rowid NOT IN (

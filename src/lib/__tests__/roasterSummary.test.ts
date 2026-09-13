@@ -180,3 +180,52 @@ describe("groupByLetter", () => {
     expect(groupByLetter([])).toEqual([]);
   });
 });
+
+describe("groupByLetter never repeats a letter", () => {
+  function summaries(names: string[]) {
+    return summarizeRoasters(
+      names.map((name, i) => makeSource({ name, url: `https://s${i}.example/f` })),
+      [],
+    );
+  }
+
+  it("puts an accented initial in the same block as its plain letter", () => {
+    const groups = groupByLetter(summaries(["Ambar", "Ámbar", "Anchorhead"]));
+    expect(groups.map((g) => g.letter)).toEqual(["A"]);
+    expect(groups[0].roasters).toHaveLength(3);
+  });
+
+  it("emits one block per letter even when sort order interleaves", () => {
+    // localeCompare with sensitivity "base" sorts these together; an
+    // adjacency-based grouping would open a second "A" block mid-list.
+    const groups = groupByLetter(summaries(["Ábra", "Alpha", "Ávila", "Beta"]));
+    const letters = groups.map((g) => g.letter);
+    expect(letters).toEqual([...new Set(letters)]);
+    expect(letters).toEqual(["A", "B"]);
+  });
+
+  it("keeps every letter unique across the real source list", () => {
+    const names = ["1000 Faces Coffee", "Ámbar", "Alpha", "49th Parallel", "Beta", "Öland", "Omega"];
+    const groups = groupByLetter(summaries(names));
+    const letters = groups.map((g) => g.letter);
+    expect(letters.length).toBe(new Set(letters).size);
+    expect(groups.reduce((n, g) => n + g.roasters.length, 0)).toBe(names.length);
+  });
+});
+
+describe("groupLetter handles awkward initials", () => {
+  it("strips diacritics", () => {
+    expect(groupLetter("Ámbar")).toBe("A");
+    expect(groupLetter("Öland")).toBe("O");
+    expect(groupLetter("Étoile")).toBe("E");
+  });
+
+  it("returns a single character when uppercasing expands", () => {
+    expect(groupLetter("ßeta")).toHaveLength(1);
+  });
+
+  it("still groups digits and symbols under #", () => {
+    expect(groupLetter("1000 Faces Coffee")).toBe("#");
+    expect(groupLetter("—dash")).toBe("#");
+  });
+});

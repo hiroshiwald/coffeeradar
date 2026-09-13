@@ -4,7 +4,7 @@
 |------|---------|-------------|
 | `src/lib/types.ts` | Shared TypeScript interfaces for the entire app | `FeedSource`, `CoffeeEntry`, `SiteUser`, `ApiResponse` |
 | `src/lib/constants.ts` | Global configuration constants | `FEED_CONCURRENCY` (25), `FEED_TIMEOUT_MS` (5000) |
-| `src/lib/db.ts` | Turso (libSQL) persistence layer — schema, queries, migrations | `hasTurso()`, `initDb()`, `getCoffees()`, `getFeedHealth()`, `getFeedSources()`, `upsertCoffees()`, `saveFeedHealth()`, `saveFeedResults()`, `cleanOldData()`, `upsertFeedSource()`, `removeFeedSource()`, `toggleFeedSource()`, `upsertFeedSuggestion()`, `listFeedSuggestions()`, `deleteFeedSuggestion()`, `dbGetSiteUsers()`, `dbGetSiteUserByUsername()`, `dbAddSiteUser()`, `dbRemoveSiteUser()`, `chunkedBatchInsert()` |
+| `src/lib/db.ts` | Turso (libSQL) persistence layer — schema, queries, migrations | `DEDUPE_COFFEES_SQL`, `hasTurso()`, `initDb()`, `getCoffees()`, `getFeedHealth()`, `getFeedSources()`, `upsertCoffees()`, `saveFeedHealth()`, `saveFeedResults()`, `cleanOldData()`, `upsertFeedSource()`, `removeFeedSource()`, `toggleFeedSource()`, `upsertFeedSuggestion()`, `listFeedSuggestions()`, `deleteFeedSuggestion()`, `dbGetSiteUsers()`, `dbGetSiteUserByUsername()`, `dbAddSiteUser()`, `dbRemoveSiteUser()`, `chunkedBatchInsert()` |
 | `src/lib/sources.ts` | In-memory store factory for dev without Turso — closure-based, no module-level mutable state | `createInMemoryStore()`, `InMemoryStore` |
 | `src/lib/sourceStore.ts` | Storage abstraction — delegates to DB or in-memory; owns private singleton store | `listMasterSources()`, `listEnabledMasterSources()`, `addOrUpdateMasterSource()`, `removeMasterSource()`, `toggleMasterSource()`, `getSourceHealth()`, `setSourceHealth()` |
 | `src/lib/feedFilters.ts` | Pure helpers for feed health classification and source filtering | `getHealthStatus()`, `computeHealthCounts()`, `filterSources()` |
@@ -15,7 +15,7 @@
 | `src/lib/crypto.ts` | Password hashing with SHA-256 and random salt | `hashPassword()`, `verifyPassword()` |
 | `src/lib/feedFetcher.ts` | Concurrent feed orchestration with batching and deduplication; `deduplicateEntries` helper keeps newest entry per ID | `fetchAllFeeds()` |
 | `src/lib/feedParser.ts` | Atom/RSS parsing and normalization into `CoffeeEntry` | `parseFeed()`, `parseAtomFeed()`, `parseRssFeed()` |
-| `src/lib/feedParserHelpers.ts` | Pure extraction helpers for XML text, images, prices | `deepText()`, `extractImage()`, `extractProductType()`, `extractShopifyPrice()`, `extractShopifyTags()` |
+| `src/lib/feedParserHelpers.ts` | Pure extraction helpers for XML text, images, prices, and entry links | `deepText()`, `extractImage()`, `extractProductType()`, `extractShopifyPrice()`, `extractShopifyTags()`, `resolveLink()` |
 | `src/lib/heuristics.ts` | Coffee metadata detection — type, process, tasting notes, price, merch | `detectType()`, `detectProcess()`, `extractNotes()`, `extractPrice()`, `isMerchandise()` |
 | `src/lib/heuristicsData.ts` | Static vocabularies — origins, processes, note words, merch keywords | `ORIGINS`, `PROCESS_MAP`, `NOTE_PATTERNS`, `NOTE_WORDS`, `TEXTURE_NOTE_WORDS`, `MERCH_KEYWORDS`, `MERCH_PRODUCT_TYPES` |
 | `src/lib/feedDiscovery.ts` | Discovers feed URLs from store URLs via autodiscovery and common paths | `discoverFeedFromStoreUrl()` |

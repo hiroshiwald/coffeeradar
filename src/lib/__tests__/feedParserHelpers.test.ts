@@ -9,6 +9,7 @@ import {
   extractShopifyPrice,
   extractShopifyTags,
   stripHtml,
+  resolveLink,
 } from "../feedParserHelpers";
 import { extractPrice } from "../heuristics";
 
@@ -176,5 +177,55 @@ describe("extractShopifyPrice", () => {
 
   it("returns empty when no price anywhere", () => {
     expect(extractShopifyPrice({}, "no price", extractPrice)).toBe("");
+  });
+});
+
+describe("resolveLink", () => {
+  const WEBSITE = "https://aka.coffee/collections/all";
+
+  it("keeps a plain http(s) string", () => {
+    expect(resolveLink("https://aka.coffee/p/1", WEBSITE)).toBe("https://aka.coffee/p/1");
+  });
+
+  it("keeps an href from an object", () => {
+    expect(resolveLink({ "@_href": "https://aka.coffee/p/2" }, WEBSITE)).toBe("https://aka.coffee/p/2");
+  });
+
+  it("takes the first usable href from an array", () => {
+    const raw = [{ "@_rel": "self" }, { "@_href": "https://aka.coffee/p/3" }];
+    expect(resolveLink(raw, WEBSITE)).toBe("https://aka.coffee/p/3");
+  });
+
+  // The cases below are why this helper exists. Each one used to yield a value
+  // that is identical across roasters, which collides coffee ids and lets the
+  // dedupe pass delete one roaster's row in favour of another's.
+  it("falls back when the element is empty", () => {
+    expect(resolveLink("", WEBSITE)).toBe(WEBSITE);
+  });
+
+  it("falls back when the link is missing", () => {
+    expect(resolveLink(undefined, WEBSITE)).toBe(WEBSITE);
+    expect(resolveLink(null, WEBSITE)).toBe(WEBSITE);
+  });
+
+  it("falls back for an object with no usable href", () => {
+    expect(resolveLink({ "@_rel": "alternate" }, WEBSITE)).toBe(WEBSITE);
+    expect(resolveLink({ "@_href": "" }, WEBSITE)).toBe(WEBSITE);
+  });
+
+  it("falls back for a non-http string", () => {
+    expect(resolveLink("/products/relative", WEBSITE)).toBe(WEBSITE);
+    expect(resolveLink("javascript:alert(1)", WEBSITE)).toBe(WEBSITE);
+  });
+
+  it("falls back for an array with nothing usable", () => {
+    expect(resolveLink([{ "@_rel": "self" }, ""], WEBSITE)).toBe(WEBSITE);
+    expect(resolveLink([], WEBSITE)).toBe(WEBSITE);
+  });
+
+  it("never returns a value two roasters could share", () => {
+    const a = resolveLink("", "https://aka.coffee/collections/all");
+    const b = resolveLink("", "https://lunacoffee.ca/collections/all");
+    expect(a).not.toBe(b);
   });
 });

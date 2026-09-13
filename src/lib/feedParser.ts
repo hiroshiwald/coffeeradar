@@ -9,6 +9,7 @@ import {
   extractShopifyPrice,
   extractShopifyTags,
   stripHtml,
+  resolveLink,
 } from "./feedParserHelpers";
 import { logger } from "./logger";
 
@@ -26,24 +27,6 @@ function buildStableId(roaster: string, urlOrTitle: string, publishedAt: string,
     fallback.trim().toLowerCase(),
   ].join("|");
   return createHash("sha1").update(normalized).digest("hex");
-}
-
-function resolveAtomLink(rawLink: unknown, fallback: string): string {
-  if (Array.isArray(rawLink)) {
-    const firstHref = rawLink
-      .map((x) =>
-        typeof x === "object" && x !== null
-          ? String((x as Record<string, unknown>)["@_href"] ?? "")
-          : "",
-      )
-      .find((x) => x.startsWith("http"));
-    if (firstHref) return firstHref;
-  } else if (typeof rawLink === "object" && rawLink !== null) {
-    return String((rawLink as Record<string, unknown>)["@_href"] ?? fallback);
-  } else if (typeof rawLink === "string" && rawLink.startsWith("http")) {
-    return rawLink;
-  }
-  return fallback;
 }
 
 export function parseAtomFeed(xml: string, roaster: string, website: string): CoffeeEntry[] {
@@ -66,7 +49,7 @@ export function parseAtomFeed(xml: string, roaster: string, website: string): Co
       );
 
       const price = extractShopifyPrice(e, allText, extractPrice);
-      const link = resolveAtomLink(e.link, website);
+      const link = resolveLink(e.link, website);
       const publishedAt = String(e.published ?? e.updated ?? "");
       const parsedDate = new Date(publishedAt);
       const isoDate = isNaN(parsedDate.getTime()) ? "" : parsedDate.toISOString();
@@ -117,7 +100,7 @@ export function parseRssFeed(xml: string, roaster: string, website: string): Cof
       const publishedAt = String(item.pubDate ?? "");
       const parsedDate = new Date(publishedAt);
       const isoDate = isNaN(parsedDate.getTime()) ? "" : parsedDate.toISOString();
-      const link = String(item.link ?? website);
+      const link = resolveLink(item.link, website);
       const stableId = buildStableId(roaster, link, publishedAt, title || String(i));
 
       return {

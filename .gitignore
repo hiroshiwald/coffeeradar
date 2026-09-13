@@ -4,3 +4,6 @@ out/
 .env*.local
 *.tsbuildinfo
 next-env.d.ts
+
+# Operator script generated for a one-off live rename; not part of the app
+apply-roaster-names.sh
