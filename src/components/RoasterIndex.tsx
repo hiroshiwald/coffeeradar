@@ -90,7 +90,7 @@ function IndexHeader({
   );
 }
 
-export default function RoasterIndex({ sources }: { sources: FeedSource[] }) {
+export default function RoasterIndex({ sources, tipUrl }: { sources: FeedSource[]; tipUrl: string | null }) {
   const { data, loading } = useCoffeeData();
   const [openUrl, setOpenUrl] = useState<string | null>(null);
 
@@ -123,7 +123,7 @@ export default function RoasterIndex({ sources }: { sources: FeedSource[] }) {
         ))}
       </div>
 
-      <Footer />
+      <Footer tipUrl={tipUrl} />
     </main>
   );
 }

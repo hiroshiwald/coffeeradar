@@ -153,7 +153,7 @@ SESSION_SECRET=          # Random string, min 32 chars (required in production)
 # Optional
 SITE_PROTECTION_ENABLED= # Set to "false" to explicitly disable site protection
 CRON_SECRET=             # Protect /api/cron with bearer auth
-NEXT_PUBLIC_TIP_URL=     # https URL for the footer tip link
+NEXT_PUBLIC_TIP_URL=     # https URL for the tip link (owner card can override)
 NEXT_PUBLIC_SUGGEST_EMAIL= # Address behind "Suggest a roaster" on /roasters
 
 # Database (optional — app works without Turso in local/dev mode)
@@ -167,8 +167,12 @@ TURSO_AUTH_TOKEN=
 - If `OWNER_USERNAME` / `OWNER_PASSWORD` are missing, owner/admin routes return `503`.
 - If `SESSION_SECRET` is missing in production, the app throws an error (fail-closed).
 - If Turso is not configured, app still works in local mode with in-memory fallback.
-- `NEXT_PUBLIC_TIP_URL` adds a tip link to the footer. The value must use https, or the
-  line is hidden. Leave it unset to show no tip link at all.
+- `NEXT_PUBLIC_TIP_URL` is the starting tip URL. It shows a link in the home header and a
+  line in the footer. The value must use https, or nothing renders. Leave it unset to show
+  no tip link at all.
+- The Tip Link card in `/owner/feeds` overrides that env value and switches the link off or
+  on without a redeploy. The setting is stored in the `site_settings` table; without Turso
+  it is held in memory and resets when the server restarts.
 - `NEXT_PUBLIC_SUGGEST_EMAIL` adds a "Suggest a roaster" link to `/roasters`. Leave it
   unset to hide the link. The address appears in the page source, so expect scrapers.
 
@@ -216,6 +220,8 @@ Current suites in `src/lib/__tests__/`:
 - `feedValidator.test.ts` — Feed URL validation
 - `feedSuggestion.test.ts` — Feed replacement suggestions
 - `tipUrl.test.ts` — Tip URL validation
+- `tipLink.test.ts` — Tip link gating and admin input validation
+- `tipLinkStore.test.ts` — Tip link settings fallback without Turso
 
 ---
 
@@ -262,7 +268,8 @@ This cleanup is run during cron refresh and manual refresh flows.
 - `src/components/coffee-table/CoffeeTableHeader.tsx` — Sortable header row.
 - `src/components/coffee-table/CoffeeTableRow.tsx` — Single coffee row.
 - `src/components/ThemeToggle.tsx` — Dark/light mode toggle.
-- `src/components/Footer.tsx` — Shared footer; shows the tip link when `NEXT_PUBLIC_TIP_URL` is set.
+- `src/components/Footer.tsx` — Shared footer; shows the tip line when the page passes a tip URL.
+- `src/components/TipLink.tsx` — Home header tip link, and the shared treatment the admin preview reuses.
 - `src/components/RoasterIndex.tsx` — A–Z roaster index with letter jump nav and expandable panels.
 - `src/components/roasters/LetterGroup.tsx` — One letter block of roaster names.
 - `src/components/roasters/RoasterPanel.tsx` — Expanded coffee list for one roaster.
@@ -274,6 +281,7 @@ This cleanup is run during cron refresh and manual refresh flows.
 - `src/app/api/auth/logout/route.ts` — Logout endpoint.
 - `src/app/api/admin/sources/*` — Owner source management APIs.
 - `src/app/api/admin/site-auth/route.ts` — Site user management API.
+- `src/app/api/admin/tip-link/route.ts` — Tip link settings API (read and save).
 - `src/app/api/cron/route.ts` — Scheduled refresh endpoint.
 
 ### Auth and security

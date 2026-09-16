@@ -121,6 +121,22 @@ export async function initDb(): Promise<void> {
   await seedFeedSources(db);
 }
 
+// Memoized bootstrap. initDb() is idempotent but costs several round trips, so
+// callers that run on every page render use this instead. A failed run clears
+// the cache and rethrows, so the next request retries rather than inheriting a
+// permanently rejected promise.
+let initPromise: Promise<void> | null = null;
+
+export function ensureDbInit(): Promise<void> {
+  if (!initPromise) {
+    initPromise = initDb().catch((err) => {
+      initPromise = null;
+      throw err;
+    });
+  }
+  return initPromise;
+}
+
 export async function getFeedSources(enabledOnly = false): Promise<FeedSource[]> {
   const db = getClient();
   if (!db) return [];
@@ -453,3 +469,28 @@ export async function dbRemoveSiteUser(username: string): Promise<void> {
   await db.execute({ sql: `DELETE FROM site_users WHERE username = ?`, args: [username] });
 }
 
+// --- Site Settings (key/value) ---
+
+export async function dbGetSettings(keys: string[]): Promise<Record<string, string>> {
+  const db = getClient();
+  if (!db || keys.length === 0) return {};
+  const placeholders = keys.map(() => "?").join(", ");
+  const result = await db.execute({
+    sql: `SELECT key, value FROM site_settings WHERE key IN (${placeholders})`,
+    args: keys,
+  });
+  const map: Record<string, string> = {};
+  for (const row of result.rows) {
+    map[String(row.key)] = String(row.value);
+  }
+  return map;
+}
+
+export async function dbSetSetting(key: string, value: string): Promise<void> {
+  const db = getClient();
+  if (!db) return;
+  await db.execute({
+    sql: `INSERT OR REPLACE INTO site_settings (key, value) VALUES (?, ?)`,
+    args: [key, value],
+  });
+}

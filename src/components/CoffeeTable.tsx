@@ -6,13 +6,14 @@ import { getNoteColor } from "@/lib/noteColors";
 import { timeAgo } from "@/lib/formatters";
 import { useCoffeeData } from "@/hooks/useCoffeeData";
 import ThemeToggle from "./ThemeToggle";
+import TipLink from "./TipLink";
 import { useCoffeeFilters } from "./coffee-table/useCoffeeFilters";
 import CoffeeTableFilters from "./coffee-table/CoffeeTableFilters";
 import CoffeeTableHeader from "./coffee-table/CoffeeTableHeader";
 import CoffeeTableRow from "./coffee-table/CoffeeTableRow";
 import Footer from "./Footer";
 
-export default function CoffeeTable() {
+export default function CoffeeTable({ tipUrl }: { tipUrl: string | null }) {
   const { data, loading, refresh, isBackgroundRefreshing } = useCoffeeData();
   const {
     filters,
@@ -35,12 +36,15 @@ export default function CoffeeTable() {
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 sm:py-10">
-      <div className="flex items-center justify-between mb-8">
+      {/* flex-wrap keeps the tip button on phones: the header group is wider than a
+          390px viewport with it, and without wrapping the whole page scrolls sideways. */}
+      <div className="flex flex-wrap items-center justify-between gap-y-3 mb-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-light tracking-tight">CoffeeRadar</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">New releases from specialty roasters</p>
         </div>
         <div className="flex items-center gap-2">
+          <TipLink tipUrl={tipUrl} />
           <a
             href="/roasters"
             className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 transition"
@@ -141,7 +145,7 @@ export default function CoffeeTable() {
         </div>
       )}
 
-      <Footer />
+      <Footer tipUrl={tipUrl} />
     </div>
   );
 }
