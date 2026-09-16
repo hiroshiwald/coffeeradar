@@ -200,7 +200,8 @@ Current suites in `src/lib/__tests__/`:
 - `crypto.test.ts` — Password hashing, verification, salt randomness
 - `authGuard.test.ts` — Auth guard for server components and API routes, fail-closed behavior
 - `feedParser.test.ts` — Atom/RSS feed parsing and normalization
-- `feedParserHelpers.test.ts` — Pure helpers for image/price/text extraction
+- `feedParserHelpers.test.ts` — Pure helpers for image/price/text extraction and link resolution
+- `apiResponse.test.ts` — `/api/coffees` response validation at the client boundary
 - `feedFetcher.test.ts` — Concurrent feed fetch orchestration
 - `coffeeFilters.test.ts` — Client-side filtering logic
 - `formatters.test.ts` — Date and text formatting utilities
@@ -214,7 +215,6 @@ Current suites in `src/lib/__tests__/`:
 - `feedTriage.test.ts` — Two-step triage for failed feeds
 - `feedValidator.test.ts` — Feed URL validation
 - `feedSuggestion.test.ts` — Feed replacement suggestions
-- `feedParserHelpers.test.ts` — Link resolution and pure extraction helpers
 - `tipUrl.test.ts` — Tip URL validation
 
 ---
@@ -306,6 +306,7 @@ This cleanup is run during cron refresh and manual refresh flows.
 - `src/lib/noteColors.ts` — Tasting note color mapping.
 - `src/lib/coffeeFilters.ts` — Client-side filtering logic.
 - `src/lib/constants.ts` — App constants.
+- `src/lib/apiResponse.ts` — Validates a `/api/coffees` response before the hook stores it.
 - `src/hooks/useCoffeeData.ts` — Client data fetching hook (with 401 redirect).
 
 ### Configuration

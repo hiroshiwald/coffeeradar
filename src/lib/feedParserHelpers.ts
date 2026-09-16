@@ -195,26 +195,40 @@ export function extractShopifyPrice(
 // empty or shared link therefore makes two roasters' coffees collide — one
 // overwrites the other on insert, or the dedupe pass deletes it.
 //
-// Feeds supply link as a bare string, an object carrying @_href, an array of
-// either, or an empty element. Anything that is not a usable http(s) URL falls
-// back to the source website, which is unique per roaster.
+// Feeds supply link as a bare string, an object carrying @_href or text, an
+// array of either, or an empty element. An absolute http(s) URL is kept byte
+// for byte, because the coffee id hashes it. A relative path resolves against
+// the source website, so two products in one feed keep distinct links.
+// Anything else falls back to the website, which is unique per roaster.
 export function resolveLink(raw: unknown, website: string): string {
-  const direct = hrefOf(raw);
-  if (direct) return direct;
-  if (Array.isArray(raw)) {
-    for (const item of raw) {
-      const href = hrefOf(item);
-      if (href) return href;
-    }
+  const candidates = Array.isArray(raw) ? raw : [raw];
+  for (const item of candidates) {
+    const href = absoluteHref(rawHref(item), website);
+    if (href) return href;
   }
   return website;
 }
 
-function hrefOf(val: unknown): string {
-  if (typeof val === "string") return val.startsWith("http") ? val : "";
-  if (typeof val === "object" && val !== null) {
-    const href = (val as Record<string, unknown>)["@_href"];
-    if (typeof href === "string" && href.startsWith("http")) return href;
+// The href attribute or text of one link element. "" when there is neither.
+function rawHref(val: unknown): string {
+  if (typeof val === "string") return val;
+  if (typeof val !== "object" || val === null) return "";
+  const obj = val as Record<string, unknown>;
+  const href = obj["@_href"] ?? obj["#text"];
+  return typeof href === "string" ? href : "";
+}
+
+// Absolute http(s) URL for one href, or "". The catch is a validated rejection,
+// not a swallowed error: `new URL()` throws on input it cannot resolve against
+// the website, and that is exactly the input to reject.
+function absoluteHref(href: string, website: string): string {
+  if (!href) return "";
+  if (/^https?:\/\//.test(href)) return href;
+  try {
+    const url = new URL(href, website);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+    return url.href;
+  } catch {
+    return "";
   }
-  return "";
 }

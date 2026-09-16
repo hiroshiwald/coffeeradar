@@ -101,6 +101,31 @@ async function fetchWithPool<T>(
   );
 }
 
+// Conditional-fetch metadata (ETag / Last-Modified) keyed by feed URL: from
+// Turso when configured, otherwise from the in-process cache.
+async function loadHttpMeta(): Promise<Record<string, FeedHttpMeta>> {
+  if (!hasTurso()) return Object.fromEntries(localHttpMeta);
+  try {
+    return await getFeedHttpMeta();
+  } catch (err) {
+    // Non-fatal: this run fetches every feed unconditionally.
+    logger.warn("[fetchAllFeeds] could not load HTTP metadata", err);
+    return {};
+  }
+}
+
+// Entries dated within the last 30 days, newest first. Undated entries drop.
+function recentNewestFirst(entries: CoffeeEntry[]): CoffeeEntry[] {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  return entries
+    .filter((entry) => {
+      const d = new Date(entry.date).getTime();
+      return !isNaN(d) && d >= cutoff.getTime();
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
 export async function fetchAllFeeds(): Promise<{
   coffees: CoffeeEntry[];
   healthy: number;
@@ -109,24 +134,11 @@ export async function fetchAllFeeds(): Promise<{
   feedResults: FeedResult[];
 }> {
   const enabled = await listEnabledMasterSources();
+  const httpMeta = await loadHttpMeta();
   const allEntries: CoffeeEntry[] = [];
   const feedResults: FeedResult[] = [];
   let healthy = 0;
   let failed = 0;
-
-  // Load conditional-fetch metadata (ETag / Last-Modified).
-  let httpMeta: Record<string, FeedHttpMeta> = {};
-  if (hasTurso()) {
-    try {
-      httpMeta = await getFeedHttpMeta();
-    } catch {
-      // Non-fatal: we'll just do unconditional fetches this run.
-    }
-  } else {
-    for (const [url, meta] of localHttpMeta) {
-      httpMeta[url] = meta;
-    }
-  }
 
   await fetchWithPool(enabled, FEED_CONCURRENCY, async (source) => {
     const r = await fetchOne(source, httpMeta[source.url]);
@@ -140,12 +152,7 @@ export async function fetchAllFeeds(): Promise<{
     if (r.ok) {
       healthy++;
       allEntries.push(...r.entries);
-      feedResults.push({
-        url: source.url,
-        status: "ok",
-        lastModified: r.lastModified,
-        etag: r.etag,
-      });
+      feedResults.push({ url: source.url, status: "ok", lastModified: r.lastModified, etag: r.etag });
     } else {
       failed++;
       feedResults.push({ url: source.url, status: "error" });
@@ -162,20 +169,6 @@ export async function fetchAllFeeds(): Promise<{
     }
   }
 
-  const deduplicated = deduplicateEntries(allEntries);
-
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 30);
-  const recent = deduplicated.filter(entry => {
-    const d = new Date(entry.date).getTime();
-    return !isNaN(d) && d >= cutoff.getTime();
-  });
-
-  recent.sort((a, b) => {
-    const da = new Date(a.date).getTime() || 0;
-    const db = new Date(b.date).getTime() || 0;
-    return db - da;
-  });
-
-  return { coffees: recent, healthy, failed, total: enabled.length, feedResults };
+  const coffees = recentNewestFirst(deduplicateEntries(allEntries));
+  return { coffees, healthy, failed, total: enabled.length, feedResults };
 }
