@@ -218,3 +218,54 @@ describe("link fallback keeps entries roaster-specific", () => {
     expect(a.id).not.toBe(b.id);
   });
 });
+
+// Relative links are legal in Atom (href is an IRI reference). They must land
+// on the roaster's domain and stay distinct per product: a feed that puts two
+// products with the same title and date behind different relative paths must
+// not have them share a link, and therefore a coffee id.
+const RELATIVE_LINK_ATOM = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Test Roaster</title>
+  <entry>
+    <title>Ethiopia</title>
+    <link href="/products/ethiopia-washed" />
+    <published>2026-03-01T00:00:00Z</published>
+  </entry>
+  <entry>
+    <title>Ethiopia</title>
+    <link href="/products/ethiopia-natural" />
+    <published>2026-03-01T00:00:00Z</published>
+  </entry>
+</feed>`;
+
+const RELATIVE_LINK_RSS = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test Roaster</title>
+    <item>
+      <title>Ethiopia</title>
+      <link>/products/ethiopia</link>
+      <pubDate>Sat, 01 Mar 2026 00:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+
+describe("relative links resolve on the roaster's domain", () => {
+  it("resolves an Atom href against the website", () => {
+    const entries = parseAtomFeed(RELATIVE_LINK_ATOM, "Aka Coffee", "https://aka.coffee/collections/all");
+    expect(entries[0].link).toBe("https://aka.coffee/products/ethiopia-washed");
+  });
+
+  it("resolves an RSS link against the website", () => {
+    const [entry] = parseRssFeed(RELATIVE_LINK_RSS, "Aka Coffee", "https://aka.coffee/collections/all");
+    expect(entry.link).toBe("https://aka.coffee/products/ethiopia");
+  });
+
+  it("keeps two same-titled products with different relative links distinct", () => {
+    const [a, b] = parseAtomFeed(RELATIVE_LINK_ATOM, "Aka Coffee", "https://aka.coffee/collections/all");
+    expect(a.coffee).toBe(b.coffee);
+    expect(a.date).toBe(b.date);
+    expect(a.link).not.toBe(b.link);
+    expect(a.id).not.toBe(b.id);
+  });
+});

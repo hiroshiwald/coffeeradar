@@ -213,9 +213,33 @@ describe("resolveLink", () => {
     expect(resolveLink({ "@_href": "" }, WEBSITE)).toBe(WEBSITE);
   });
 
-  it("falls back for a non-http string", () => {
-    expect(resolveLink("/products/relative", WEBSITE)).toBe(WEBSITE);
+  it("falls back for a non-http scheme", () => {
     expect(resolveLink("javascript:alert(1)", WEBSITE)).toBe(WEBSITE);
+    expect(resolveLink("mailto:hi@aka.coffee", WEBSITE)).toBe(WEBSITE);
+    expect(resolveLink({ "@_href": "javascript:alert(1)" }, WEBSITE)).toBe(WEBSITE);
+  });
+
+  // A relative path is still a distinct product. Collapsing it to the website
+  // would give every product in the feed the same link, and two with the same
+  // title and date would then share a coffee id and overwrite each other.
+  it("resolves a relative path against the website", () => {
+    expect(resolveLink("/products/relative", WEBSITE)).toBe("https://aka.coffee/products/relative");
+    expect(resolveLink({ "@_href": "/p/4" }, WEBSITE)).toBe("https://aka.coffee/p/4");
+    expect(resolveLink("p/5", WEBSITE)).toBe("https://aka.coffee/collections/p/5");
+  });
+
+  it("keeps an absolute link byte for byte, since the coffee id hashes it", () => {
+    expect(resolveLink("https://aka.coffee", WEBSITE)).toBe("https://aka.coffee");
+    expect(resolveLink("https://aka.coffee/p/Ä?x=1#f", WEBSITE)).toBe("https://aka.coffee/p/Ä?x=1#f");
+  });
+
+  it("reads the element text when the link carries attributes", () => {
+    const raw = { "#text": "https://aka.coffee/p/6", "@_rel": "alternate" };
+    expect(resolveLink(raw, WEBSITE)).toBe("https://aka.coffee/p/6");
+  });
+
+  it("falls back when the website itself cannot serve as a base", () => {
+    expect(resolveLink("/products/x", "not a url")).toBe("not a url");
   });
 
   it("falls back for an array with nothing usable", () => {
@@ -227,5 +251,8 @@ describe("resolveLink", () => {
     const a = resolveLink("", "https://aka.coffee/collections/all");
     const b = resolveLink("", "https://lunacoffee.ca/collections/all");
     expect(a).not.toBe(b);
+    const relA = resolveLink("/products/x", "https://aka.coffee/collections/all");
+    const relB = resolveLink("/products/x", "https://lunacoffee.ca/collections/all");
+    expect(relA).not.toBe(relB);
   });
 });

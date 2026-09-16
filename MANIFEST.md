@@ -13,7 +13,7 @@
 | `src/lib/authGuard.ts` | Auth validation for server components and API routes | `checkSiteAuth()`, `checkSiteAuthFromRequest()` |
 | `src/lib/session.ts` | HMAC-SHA-256 cookie session management (7-day expiry) | `createSessionCookie()`, `validateSessionCookie()`, `clearSessionCookie()`, `getSessionCookieName()` |
 | `src/lib/crypto.ts` | Password hashing with SHA-256 and random salt | `hashPassword()`, `verifyPassword()` |
-| `src/lib/feedFetcher.ts` | Concurrent feed orchestration with batching and deduplication; `deduplicateEntries` helper keeps newest entry per ID | `fetchAllFeeds()` |
+| `src/lib/feedFetcher.ts` | Concurrent feed orchestration with batching and deduplication; `deduplicateEntries` keeps the newest entry per ID, `recentNewestFirst` applies the 30-day window | `fetchAllFeeds()` |
 | `src/lib/feedParser.ts` | Atom/RSS parsing and normalization into `CoffeeEntry` | `parseFeed()`, `parseAtomFeed()`, `parseRssFeed()` |
 | `src/lib/feedParserHelpers.ts` | Pure extraction helpers for XML text, images, prices, and entry links | `deepText()`, `extractImage()`, `extractProductType()`, `extractShopifyPrice()`, `extractShopifyTags()`, `resolveLink()` |
 | `src/lib/heuristics.ts` | Coffee metadata detection — type, process, tasting notes, price, merch | `detectType()`, `detectProcess()`, `extractNotes()`, `extractPrice()`, `isMerchandise()` |
@@ -24,6 +24,7 @@
 | `src/lib/coffeeFilters.ts` | Client-side filtering and sorting logic | `filterCoffees()`, `sortCoffees()`, `countNotes()` |
 | `src/lib/roasterSummary.ts` | Joins feed sources to coffees for the roasters index | `summarizeRoasters()`, `countActive()`, `groupLetter()`, `groupByLetter()` |
 | `src/lib/tipUrl.ts` | Validates the optional footer tip URL | `getTipUrl()` |
+| `src/lib/apiResponse.ts` | Validates a `/api/coffees` response at the client boundary; rejects error statuses and malformed bodies | `readApiResponse()` |
 | `src/lib/noteColors.ts` | Maps tasting note names to Tailwind color classes | `getNoteColor()` |
 | `src/lib/formatters.ts` | Date and text formatting utilities | `timeAgo()`, `formatDate()`, `formatHostname()` |
 | `src/lib/logger.ts` | Console wrapper, silent under test | `logger` |

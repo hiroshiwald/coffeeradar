@@ -286,11 +286,12 @@ export async function cleanOldFeedResults(): Promise<number> {
 // coffee+link+date lets the next cleanup run remove the stale row.
 //
 // This is safe only because `link` is roaster-specific, which resolveLink() in
-// feedParserHelpers.ts enforces: anything that is not a usable http(s) URL falls
-// back to the source's own website. Do not weaken that fallback. Before it
-// existed, an empty <link> element parsed to "" for every roaster, so two
-// roasters publishing a same-named coffee on the same date landed in one group
-// and this DELETE removed one of them.
+// feedParserHelpers.ts enforces: a relative path resolves against the source's
+// own website, and anything that is not an http(s) URL falls back to that
+// website. Do not weaken that fallback. Before it existed, an empty <link>
+// element parsed to "" for every roaster, so two roasters publishing a
+// same-named coffee on the same date landed in one group and this DELETE
+// removed one of them.
 export const DEDUPE_COFFEES_SQL = `
     DELETE FROM coffees
     WHERE rowid NOT IN (
