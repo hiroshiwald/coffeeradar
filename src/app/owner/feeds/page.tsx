@@ -5,8 +5,10 @@ import { useOwnerFilters } from "@/components/owner-feeds/useOwnerFilters";
 import { useOwnerActions } from "@/components/owner-feeds/useOwnerActions";
 import { useOwnerCron } from "@/components/owner-feeds/useOwnerCron";
 import { useOwnerAuth } from "@/components/owner-feeds/useOwnerAuth";
+import { useOwnerTipLink } from "@/components/owner-feeds/useOwnerTipLink";
 import { OwnerPageHeader } from "@/components/owner-feeds/OwnerPageHeader";
 import { SiteAccessControl } from "@/components/owner-feeds/SiteAccessControl";
+import { TipLinkControl } from "@/components/owner-feeds/TipLinkControl";
 import { FeedFilterBar } from "@/components/owner-feeds/FeedFilterBar";
 import { QuickAddForm } from "@/components/owner-feeds/QuickAddForm";
 import { AddFeedForm } from "@/components/owner-feeds/AddFeedForm";
@@ -18,6 +20,7 @@ export default function OwnerFeedsPage() {
   const actions = useOwnerActions({ setSources, setSuggestions });
   const cron = useOwnerCron({ setSuggestions, fetchSources, setStatusMessage: actions.setStatusMessage });
   const auth = useOwnerAuth();
+  const tipLink = useOwnerTipLink({ setStatusMessage: actions.setStatusMessage });
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6 sm:py-10">
@@ -30,6 +33,10 @@ export default function OwnerFeedsPage() {
         siteUsers={auth.siteUsers} protectionEnabled={auth.protectionEnabled}
         authStatusMessage={auth.authStatusMessage} busy={actions.busy || auth.authBusy}
         onAuthAction={auth.doAuthAction}
+      />
+      <TipLinkControl
+        enabled={tipLink.enabled} url={tipLink.url} busy={actions.busy || tipLink.busy}
+        onUrlChange={tipLink.setUrl} onToggle={tipLink.toggle} onSave={tipLink.saveUrl}
       />
       {actions.statusMessage && (
         <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">{actions.statusMessage}</p>

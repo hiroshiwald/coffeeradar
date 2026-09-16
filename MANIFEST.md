@@ -4,7 +4,7 @@
 |------|---------|-------------|
 | `src/lib/types.ts` | Shared TypeScript interfaces for the entire app | `FeedSource`, `CoffeeEntry`, `SiteUser`, `ApiResponse` |
 | `src/lib/constants.ts` | Global configuration constants | `FEED_CONCURRENCY` (25), `FEED_TIMEOUT_MS` (5000) |
-| `src/lib/db.ts` | Turso (libSQL) persistence layer — schema, queries, migrations | `DEDUPE_COFFEES_SQL`, `hasTurso()`, `initDb()`, `getCoffees()`, `getFeedHealth()`, `getFeedSources()`, `upsertCoffees()`, `saveFeedHealth()`, `saveFeedResults()`, `cleanOldData()`, `upsertFeedSource()`, `removeFeedSource()`, `toggleFeedSource()`, `upsertFeedSuggestion()`, `listFeedSuggestions()`, `deleteFeedSuggestion()`, `dbGetSiteUsers()`, `dbGetSiteUserByUsername()`, `dbAddSiteUser()`, `dbRemoveSiteUser()`, `chunkedBatchInsert()` |
+| `src/lib/db.ts` | Turso (libSQL) persistence layer — schema, queries, migrations | `DEDUPE_COFFEES_SQL`, `hasTurso()`, `initDb()`, `getCoffees()`, `getFeedHealth()`, `getFeedSources()`, `upsertCoffees()`, `saveFeedHealth()`, `saveFeedResults()`, `cleanOldData()`, `upsertFeedSource()`, `removeFeedSource()`, `toggleFeedSource()`, `upsertFeedSuggestion()`, `listFeedSuggestions()`, `deleteFeedSuggestion()`, `dbGetSiteUsers()`, `dbGetSiteUserByUsername()`, `dbAddSiteUser()`, `dbRemoveSiteUser()`, `dbGetSettings()`, `dbSetSetting()`, `ensureDbInit()`, `chunkedBatchInsert()` |
 | `src/lib/sources.ts` | In-memory store factory for dev without Turso — closure-based, no module-level mutable state | `createInMemoryStore()`, `InMemoryStore` |
 | `src/lib/sourceStore.ts` | Storage abstraction — delegates to DB or in-memory; owns private singleton store | `listMasterSources()`, `listEnabledMasterSources()`, `addOrUpdateMasterSource()`, `removeMasterSource()`, `toggleMasterSource()`, `getSourceHealth()`, `setSourceHealth()` |
 | `src/lib/feedFilters.ts` | Pure helpers for feed health classification and source filtering | `getHealthStatus()`, `computeHealthCounts()`, `filterSources()` |
@@ -23,7 +23,9 @@
 | `src/lib/feedValidator.ts` | Validates feed URL returns parseable XML with entries | `isValidFeedUrl()` |
 | `src/lib/coffeeFilters.ts` | Client-side filtering and sorting logic | `filterCoffees()`, `sortCoffees()`, `countNotes()` |
 | `src/lib/roasterSummary.ts` | Joins feed sources to coffees for the roasters index | `summarizeRoasters()`, `countActive()`, `groupLetter()`, `groupByLetter()` |
-| `src/lib/tipUrl.ts` | Validates the optional footer tip URL | `getTipUrl()` |
+| `src/lib/tipUrl.ts` | Validates the optional tip URL | `getTipUrl()` |
+| `src/lib/tipLink.ts` | Tip link gate — toggle then `getTipUrl()` — and admin input validation | `resolveTipUrl()`, `validateTipLinkInput()`, `TIP_URL_MAX_LENGTH` |
+| `src/lib/tipLinkStore.ts` | Tip link settings — `site_settings` rows, env default, in-process fallback | `readTipLinkSettings()`, `writeTipLinkSettings()` |
 | `src/lib/apiResponse.ts` | Validates a `/api/coffees` response at the client boundary; rejects error statuses and malformed bodies | `readApiResponse()` |
 | `src/lib/noteColors.ts` | Maps tasting note names to Tailwind color classes | `getNoteColor()` |
 | `src/lib/formatters.ts` | Date and text formatting utilities | `timeAgo()`, `formatDate()`, `formatHostname()` |
@@ -41,8 +43,10 @@
 | `src/app/api/admin/sources/route.ts` | Admin source management — CRUD, discovery, triage, suggestions; POST dispatches to 8 module-private action handlers | `GET`, `POST` handlers |
 | `src/app/api/admin/sources/csv/route.ts` | Exports source list as CSV | `GET` handler |
 | `src/app/api/admin/site-auth/route.ts` | Admin user management — list, add, remove site users | `GET`, `POST` handlers |
+| `src/app/api/admin/tip-link/route.ts` | Tip link settings — read and save the toggle and URL | `GET`, `POST` handlers |
 | `src/components/CoffeeTable.tsx` | Main UI orchestrator — data fetching, filtering, rendering | Client component |
-| `src/components/Footer.tsx` | Shared footer — version line, plus tip link when `NEXT_PUBLIC_TIP_URL` is set | Server-safe component |
+| `src/components/Footer.tsx` | Shared footer — version line, plus the tip line when the page passes a tip URL | Server-safe component |
+| `src/components/TipLink.tsx` | Home header tip link, and the treatment the admin preview reuses | Client-safe component |
 | `src/components/RoasterIndex.tsx` | A–Z roaster index — letter jump nav, expandable panels | Client component |
 | `src/components/roasters/LetterGroup.tsx` | One letter block of roaster names | Client component |
 | `src/components/roasters/RoasterPanel.tsx` | Expanded coffee list for one roaster | Client component |
@@ -57,6 +61,7 @@
 | `src/components/owner-feeds/OwnerPageHeader.tsx` | Admin page title bar with counts and cron/export buttons | Client component |
 | `src/components/owner-feeds/QuickAddForm.tsx` | Store URL entry with auto-discovery | Client component |
 | `src/components/owner-feeds/SiteAccessControl.tsx` | User management form and user list | Client component |
+| `src/components/owner-feeds/TipLinkControl.tsx` | Tip link card — state label, switch, URL field, live preview | Client component |
 | `src/components/owner-feeds/SourceList.tsx` | Renders filtered feed source list with suggestion cards | Client component |
 | `src/components/owner-feeds/SuggestionCards.tsx` | Recommendation/deletion/manual-review card variants | Client component |
 | `src/components/owner-feeds/useOwnerActions.ts` | Admin action dispatcher hook (add, remove, toggle, etc.) | `useOwnerActions()` |
@@ -64,6 +69,7 @@
 | `src/components/owner-feeds/useOwnerCron.ts` | Cron trigger and failed-feed rescan hook | `useOwnerCron()` |
 | `src/components/owner-feeds/useOwnerFilters.ts` | Source search and health-filter state hook | `useOwnerFilters()` |
 | `src/components/owner-feeds/useOwnerSources.ts` | Source list fetching and suggestion state hook | `useOwnerSources()` |
+| `src/components/owner-feeds/useOwnerTipLink.ts` | Tip link settings state, optimistic toggle, save hook | `useOwnerTipLink()` |
 | `src/components/ThemeToggle.tsx` | Dark/light mode toggle | Client component |
 | `src/hooks/useCoffeeData.ts` | Data fetching hook for `/api/coffees` | `useCoffeeData()` |
 | `middleware.ts` | Route protection — redirects unauthenticated users, 401 for API | Next.js middleware |
@@ -115,7 +121,7 @@
 **Frontend → Backend**
 - `useCoffeeData` hook → `GET /api/coffees`
 - `CoffeeTable` → `useCoffeeData`, `useCoffeeFilters`, `coffeeFilters`
-- Admin page → `GET/POST /api/admin/sources`, `GET/POST /api/admin/site-auth`
+- Admin page → `GET/POST /api/admin/sources`, `GET/POST /api/admin/site-auth`, `GET/POST /api/admin/tip-link`
 - Login page → `POST /api/auth/login`
 
 **External Services**

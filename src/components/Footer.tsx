@@ -1,11 +1,13 @@
-import { getTipUrl } from "@/lib/tipUrl";
+interface FooterProps {
+  /**
+   * Already through resolveTipUrl() on the server. Null means the owner turned
+   * the tip link off or the stored URL failed getTipUrl(); either way the tip
+   * line stays out of the markup.
+   */
+  tipUrl: string | null;
+}
 
-export default function Footer() {
-  // The literal `process.env.NEXT_PUBLIC_TIP_URL` must appear here: Next.js
-  // inlines NEXT_PUBLIC_* vars into the client bundle by replacing this exact
-  // text at build time. Leave the tip line off entirely when it is unset.
-  const tipUrl = getTipUrl(process.env.NEXT_PUBLIC_TIP_URL);
-
+export default function Footer({ tipUrl }: FooterProps) {
   return (
     <footer className="mt-10 pt-5 border-t border-gray-100 dark:border-gray-800 flex flex-col items-center gap-1.5 text-center">
       {tipUrl && (
