@@ -31,7 +31,7 @@ function CoffeeRow({ coffee: c }: { coffee: CoffeeEntry }) {
         >
           {c.coffee}
         </a>
-        {meta && <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{meta}</span>}
+        {meta && <span className="text-xs text-gray-500 dark:text-gray-400">{meta}</span>}
       </div>
 
       <div className="col-start-2 sm:col-start-3 flex flex-wrap gap-1">
@@ -63,26 +63,29 @@ export default function RoasterPanel({
   return (
     <div id={id} className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 text-[13px]">
-        <span className="font-medium text-[15px] truncate">{summary.name}</span>
+        <span className="font-medium text-[15px] min-w-0 break-words">{summary.name}</span>
         <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">{summary.count} recent</span>
-        {hostname && (
-          <a
-            href={summary.website}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-auto text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white whitespace-nowrap truncate"
+        {/* One group, so the close button stays at the right beside the link when the row wraps. */}
+        <div className="ml-auto flex items-center gap-3 min-w-0">
+          {hostname && (
+            <a
+              href={summary.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white whitespace-nowrap truncate"
+            >
+              {hostname} ↗
+            </a>
+          )}
+          <button
+            type="button"
+            aria-label={`Close ${summary.name}`}
+            onClick={onClose}
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white px-1"
           >
-            {hostname} ↗
-          </a>
-        )}
-        <button
-          type="button"
-          aria-label={`Close ${summary.name}`}
-          onClick={onClose}
-          className={`${hostname ? "" : "ml-auto "}text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white px-1`}
-        >
-          ✕
-        </button>
+            ✕
+          </button>
+        </div>
       </div>
 
       {summary.coffees.map((c) => (

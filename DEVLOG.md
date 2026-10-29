@@ -952,13 +952,27 @@ An 8-lens adversarial review raised 32 findings; each went to 3 independent skep
 - **Browser verification**: Playwright (global install) against `next dev`, chromium at `/opt/pw-browsers`. Header and card captured in light and dark. Toggling off removed the header link, the home footer line and the `/roasters` footer line. Switching on with an empty URL reverted the switch to Hidden and surfaced "The tip link needs an https URL before it can be turned on." At 390px the question text is hidden, the button renders, no horizontal scroll.
 
 ### 2026-10-29 — Mobile responsive pass
-- **Changed**: CSS classes only, in 10 files. No new files, props or logic.
-  - Home table: below `lg` each row is a card and the header is a wrapping sort bar. At `lg` and up the table is unchanged.
-  - Home filters: 2-column grid below `md`, in place of 5 stacked full-width controls.
+- **Changed**: class changes plus one `globals.css` rule, in 10 files. No new files or props.
+  - Home table: below `lg` each row is a card and the header is a wrapping sort bar. At `xl` and up the table is unchanged. From `lg` to `xl`, long roaster names can wrap so the table fits.
+  - Home filters: no longer 5 stacked controls below `sm` and one cramped row from `sm` to `md`. (Reworked in the next entry.)
   - Owner header and tip preview wrap. Quick Add and Tip Link inputs have `min-w-0`. Manual Add stacks until `lg`.
   - Roaster panel header wraps, so the name is no longer cut to "Bluepr…" at 360px.
   - `globals.css`: fields are 16px below `sm`, so iOS Safari does not zoom in on focus.
 - **Why**: the table needed 1012px. On a 390px phone only image, date and roaster showed, and coffee, notes and price were off to the side. `/owner/feeds` scrolled sideways at 320px and at 640 to 768px.
 - **Verified**: Playwright against `next start` with `/api/coffees` stubbed, at 320, 360, 390, 640, 768, 1024 and 1400px on `/`, `/roasters`, `/login` and `/owner/feeds`. All 28 combinations have no page overflow and no inner table scroll (before: the table scrolled at every width up to 1024; owner overflowed at 3 widths). At 390px: sort, note filter, loading skeleton and empty state work. Light and dark checked. `npm test` 272/272, `npx tsc --noEmit` and `npm run build` clean.
 - **Gotcha**: dropping `whitespace-nowrap` on the roaster cell fixed the 1024px overflow, but long names then wrapped on desktop too. Table auto layout squeezes every column that can wrap. `xl:whitespace-nowrap` keeps desktop at 1280px and up as it was.
-- **Gotcha**: `display: block` on table elements can drop table semantics in some screen readers. That applies only below `lg`, where the rows are visually cards.
+
+### 2026-10-29 — Mobile pass: act on an adversarial review
+- **Review**: 5 independent finders (phone layout, desktop regression against `8bf2ee2`, other pages, accessibility, code). 27 raw findings, 20 after dedupe. Each was reproduced by one verifier and scoped by another. 18 confirmed, 2 dropped as intended behaviour.
+- **Caused by the first pass, fixed**:
+  - A coffee or roaster name with no spaces ran past the card edge below `lg` and could not be reached. The row now has `max-lg:[overflow-wrap:anywhere]`.
+  - Removed `content-visibility: auto` from the row. Containment does not apply to `display: table-row`, so the 2026-04-13 entry's "browser skips off-screen rows" never held. The flex cards switched it on, and the 56px size hint against cards 80-245px tall made the page grow while scrolling (`scrollHeight` 26095 to 41967 at 390px over 300 rows).
+  - Chromium keeps table roles on block and flex table elements. With `hidden` cells, screen readers heard 6 column headers over rows of 5 to 8 cells, so cells were read under the wrong header. Below `lg` the image and Notes headers and empty cells are now `sr-only`.
+  - The roaster panel close button wrapped alone to the left. The hostname link and the button are now one right-aligned group, which also removed a template-literal `ml-auto` toggle.
+  - Half-width filter selects cut "All Processes" at 320px. The filters now wrap with `grow`: a control drops to the next line before its text is cut. Nowrap row at `md` and up.
+  - Rows with no notes kept an empty flex line. The notes wrapper renders only when notes exist.
+- **Pre-existing on phones, fixed**: sort headers were clickable `th` elements with no keyboard access; they are now buttons (`SortableTh`). Long site usernames and the Add User form overflowed. Owner source rows gave names 78-148px; below `sm` the name now takes a second line. The panel name and meta line were truncated at 320px. Letter-nav links were 19x20px tap targets. "Updating feeds…" squeezed the search box in the `md` row; it moved to the meta line. The roasters subtitle touched the letter nav when there is no suggest link.
+- **16px field rule**: now `max(16px, 0.875rem)`, so a larger user default font size wins, and it also applies on `(pointer: coarse)` for landscape phones.
+- **Verified**: 28/28 page and width combinations with no overflow, sort and note filter at 390px, no roaster wrap at 1280 and 1400. `npm test` 272/272, `npx tsc --noEmit` and `npm run build` clean.
+- **Gotcha**: on mobile table markup, hide cells with `sr-only`, not `hidden`. `display: none` removes a cell from the accessibility tree and shifts every later cell under the wrong header.
+- **Gotcha**: content-visibility needs a size hint near the real height. A wrong hint is worse than none: the scrollbar moves while the user reads.

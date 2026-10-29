@@ -81,6 +81,7 @@ export default function CoffeeTable({ tipUrl }: { tipUrl: string | null }) {
             )}
           </>
         )}
+        {isBackgroundRefreshing && <span>Updating feeds&hellip;</span>}
         <span className="ml-auto">{filtered.length} coffees</span>
       </div>
 

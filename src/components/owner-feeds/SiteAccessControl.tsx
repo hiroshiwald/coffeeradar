@@ -42,16 +42,16 @@ export function SiteAccessControl({
       )}
       {authStatusMessage && <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">{authStatusMessage}</p>}
       <form onSubmit={handleAddUser} className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input type="text" placeholder="Username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} autoComplete="off" className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm" required disabled={busy} />
-        <input type="password" placeholder="Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm" required disabled={busy} />
+        <input type="text" placeholder="Username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} autoComplete="off" className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm" required disabled={busy} />
+        <input type="password" placeholder="Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm" required disabled={busy} />
         <button type="submit" disabled={busy} className="px-4 py-2 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm disabled:opacity-50">Add User</button>
       </form>
       {siteUsers.length > 0 && (
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800/50">
           {siteUsers.map((user) => (
-            <div key={user.username} className="flex items-center justify-between px-4 py-2.5">
-              <div>
-                <span className="text-sm font-medium">{user.username}</span>
+            <div key={user.username} className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <div className="min-w-0">
+                <span className="text-sm font-medium break-all">{user.username}</span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">added {new Date(user.createdAt).toLocaleDateString()}</span>
               </div>
               <button onClick={() => onAuthAction("remove_user", { username: user.username })} disabled={busy} className="text-xs text-red-400 hover:text-red-600 transition">Remove</button>

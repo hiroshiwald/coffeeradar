@@ -29,10 +29,11 @@ export default function CoffeeTableFilters({
   onToggleMerch,
   onRefresh,
 }: Props) {
-  // Two columns below md: search across the top, then the selects and buttons in pairs.
+  // Below md the row wraps: search takes the first line, and each control grows
+  // to fill its line. A control drops to the next line rather than cut its text.
   return (
-    <div className="grid grid-cols-2 md:flex gap-3 mb-6">
-      <div className="relative col-span-2 flex-1">
+    <div className="flex flex-wrap md:flex-nowrap gap-3 mb-6">
+      <div className="relative basis-full md:flex-1">
         <svg
           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
           fill="none"
@@ -54,7 +55,7 @@ export default function CoffeeTableFilters({
       <select
         value={filterType}
         onChange={(e) => onTypeChange(e.target.value)}
-        className="px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
+        className="grow md:grow-0 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
       >
         <option value="">All Types</option>
         <option value="Single Origin">Single Origin</option>
@@ -65,7 +66,7 @@ export default function CoffeeTableFilters({
       <select
         value={filterProcess}
         onChange={(e) => onProcessChange(e.target.value)}
-        className="px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
+        className="grow md:grow-0 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
       >
         <option value="">All Processes</option>
         <option value="Washed">Washed</option>
@@ -81,7 +82,7 @@ export default function CoffeeTableFilters({
 
       <button
         onClick={onToggleMerch}
-        className={`px-3 py-2.5 rounded-lg border text-sm transition whitespace-nowrap ${
+        className={`grow md:grow-0 px-3 py-2.5 rounded-lg border text-sm transition whitespace-nowrap ${
           showMerch
             ? "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
             : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400"
@@ -93,7 +94,7 @@ export default function CoffeeTableFilters({
       <button
         onClick={onRefresh}
         disabled={loading || isBackgroundRefreshing}
-        className="px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50 whitespace-nowrap"
+        className="grow md:grow-0 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50 whitespace-nowrap"
       >
         {loading ? (
           <span className="flex items-center gap-2">
@@ -107,11 +108,6 @@ export default function CoffeeTableFilters({
           "Refresh"
         )}
       </button>
-      {isBackgroundRefreshing && (
-        <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
-          Updating feeds&hellip;
-        </span>
-      )}
     </div>
   );
 }
