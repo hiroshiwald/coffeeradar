@@ -12,14 +12,13 @@ interface Props {
 
 // Below lg the row is a card: the image sits in the left padding, then roaster
 // and date, the coffee on its own line, type, process and price, and notes last.
-// Empty cells hide there so they leave no stray gap. Roaster names may wrap
-// between lg and xl so the table fits a 1024px screen.
+// Empty cells are sr-only there: no stray gap, and screen readers still get one
+// cell per column header. overflow-wrap:anywhere breaks a name with no spaces
+// inside the card. Roaster names may wrap between lg and xl so the table fits a
+// 1024px screen.
 function CoffeeTableRow({ coffee: c, onSelectNote }: Props) {
   return (
-    <tr
-      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 56px' }}
-      className="relative flex flex-wrap items-center gap-x-3 gap-y-1 py-3 pl-[68px] pr-4 lg:table-row hover:bg-gray-50 dark:hover:bg-gray-900/30"
-    >
+    <tr className="relative flex flex-wrap items-center gap-x-3 gap-y-1 py-3 pl-[68px] pr-4 max-lg:[overflow-wrap:anywhere] lg:table-row hover:bg-gray-50 dark:hover:bg-gray-900/30">
       <td className="absolute left-4 top-3 lg:static lg:px-4 lg:py-2">
         {c.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -54,7 +53,7 @@ function CoffeeTableRow({ coffee: c, onSelectNote }: Props) {
           {c.coffee}
         </a>
       </td>
-      <td className="max-lg:empty:hidden lg:px-4 lg:py-3 whitespace-nowrap">
+      <td className="max-lg:empty:sr-only lg:px-4 lg:py-3 whitespace-nowrap">
         {c.isMerch ? (
           <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
             Merch
@@ -71,21 +70,23 @@ function CoffeeTableRow({ coffee: c, onSelectNote }: Props) {
           </span>
         ) : null}
       </td>
-      <td className="max-lg:empty:hidden lg:px-4 lg:py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.process}</td>
-      <td className="basis-full order-last lg:px-4 lg:py-3">
-        <div className="flex flex-wrap gap-1">
-          {c.tastingNotes.map((note) => (
-            <button
-              key={note}
-              onClick={() => onSelectNote(note)}
-              className={`px-2 py-0.5 rounded-full text-xs transition-colors hover:opacity-80 ${getNoteColor(note)}`}
-            >
-              {note}
-            </button>
-          ))}
-        </div>
+      <td className="max-lg:empty:sr-only lg:px-4 lg:py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.process}</td>
+      <td className="max-lg:empty:sr-only basis-full order-last lg:px-4 lg:py-3">
+        {c.tastingNotes.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {c.tastingNotes.map((note) => (
+              <button
+                key={note}
+                onClick={() => onSelectNote(note)}
+                className={`px-2 py-0.5 rounded-full text-xs transition-colors hover:opacity-80 ${getNoteColor(note)}`}
+              >
+                {note}
+              </button>
+            ))}
+          </div>
+        )}
       </td>
-      <td className="max-lg:empty:hidden lg:px-4 lg:py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap font-mono text-xs tabular-nums">
+      <td className="max-lg:empty:sr-only lg:px-4 lg:py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap font-mono text-xs tabular-nums">
         {c.price}
       </td>
     </tr>

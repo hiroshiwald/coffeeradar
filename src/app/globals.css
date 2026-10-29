@@ -14,13 +14,15 @@ body {
   @apply bg-gray-950 text-gray-100;
 }
 
-/* iOS Safari zooms the page when a focused field is under 16px. !important
-   because the text-sm class on each field would otherwise win. */
-@media (max-width: 639px) {
+/* iOS Safari zooms the page when a focused field is under 16px. Touch screens
+   are included for landscape phones wider than 639px. max() keeps a larger
+   default font size the user chose. !important because the text-sm class on
+   each field would otherwise win. */
+@media (max-width: 639px), (pointer: coarse) {
   input,
   select,
   textarea {
-    font-size: 16px !important;
+    font-size: max(16px, 0.875rem) !important;
   }
 }
 

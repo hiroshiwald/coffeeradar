@@ -39,12 +39,12 @@ function subtitle(
 
 function LetterNav({ letters }: { letters: string[] }) {
   return (
-    <div className="flex flex-wrap gap-0.5 mb-6 text-xs font-mono">
+    <div className="flex flex-wrap gap-0.5 mt-5 mb-6 text-xs font-mono">
       {letters.map((letter) => (
         <a
           key={letter}
           href={`#${letterAnchorId(letter)}`}
-          className="px-1.5 py-0.5 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-white"
+          className="px-2 py-1 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-white"
         >
           {letter}
         </a>
@@ -81,7 +81,7 @@ function IndexHeader({
       {SUGGEST_EMAIL && (
         <a
           href={`mailto:${SUGGEST_EMAIL}?subject=Roaster suggestion`}
-          className="inline-block mt-1 mb-5 text-xs underline underline-offset-2 text-gray-500 dark:text-gray-400"
+          className="inline-block mt-1 text-xs underline underline-offset-2 text-gray-500 dark:text-gray-400"
         >
           Suggest a roaster
         </a>
