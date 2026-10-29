@@ -12,7 +12,7 @@ interface TipLinkControlProps {
 /** The real header treatment, faded when off and never clickable. */
 function TipLinkPreview({ enabled }: { enabled: boolean }) {
   return (
-    <div className="mt-3 px-3.5 py-3 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center gap-2.5">
+    <div className="mt-3 px-3.5 py-3 rounded-lg border border-dashed border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-wrap items-center gap-2.5">
       <span className="text-[11px] uppercase tracking-[0.06em] text-gray-400 font-mono">Preview</span>
       <div className={enabled ? "opacity-100" : "opacity-[0.35]"}>
         <TipLinkTreatment href={null} />
@@ -44,7 +44,7 @@ export function TipLinkControl({ enabled, url, busy, onUrlChange, onToggle, onSa
         only, otherwise nothing renders.
       </p>
       <div className="flex gap-3 items-center">
-        <input type="url" placeholder="https://ko-fi.com/yourhandle" value={url} onChange={(e) => onUrlChange(e.target.value)} disabled={busy} className="flex-[2] px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm" />
+        <input type="url" placeholder="https://ko-fi.com/yourhandle" value={url} onChange={(e) => onUrlChange(e.target.value)} disabled={busy} className="flex-[2] min-w-0 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm" />
         <button onClick={onSave} disabled={busy} className="px-4 py-2 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm disabled:opacity-50">Save</button>
       </div>
       <TipLinkPreview enabled={enabled} />

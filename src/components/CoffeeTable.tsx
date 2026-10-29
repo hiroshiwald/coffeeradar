@@ -99,23 +99,25 @@ export default function CoffeeTable({ tipUrl }: { tipUrl: string | null }) {
         </div>
       )}
 
+      {/* Below lg the table, its rows and its cells render as blocks so each coffee
+          reads as a card. The full table needs about 1000px. */}
       <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
-        <table className="w-full text-sm">
+        <table className="block lg:table w-full text-sm">
           <CoffeeTableHeader sortKey={sortKey} sortDir={sortDir} onToggleSort={toggleSort} />
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800/50">
+          <tbody className="block lg:table-row-group divide-y divide-gray-100 dark:divide-gray-800/50">
             {loading && !data ? (
               Array.from({ length: 8 }).map((_, i) => (
-                <tr key={i}>
+                <tr key={i} className="grid grid-cols-4 gap-3 px-4 py-3 lg:table-row">
                   {Array.from({ length: 8 }).map((_, j) => (
-                    <td key={j} className="px-4 py-3">
+                    <td key={j} className="lg:px-4 lg:py-3">
                       <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
                     </td>
                   ))}
                 </tr>
               ))
             ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+              <tr className="block lg:table-row">
+                <td colSpan={8} className="block lg:table-cell px-4 py-12 text-center text-gray-400">
                   No coffees match your filters.
                 </td>
               </tr>
