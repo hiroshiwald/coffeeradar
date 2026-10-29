@@ -50,7 +50,7 @@ export function SiteAccessControl({
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800/50">
           {siteUsers.map((user) => (
             <div key={user.username} className="flex items-center justify-between gap-3 px-4 py-2.5">
-              <div className="min-w-0">
+              <div>
                 <span className="text-sm font-medium break-all">{user.username}</span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">added {new Date(user.createdAt).toLocaleDateString()}</span>
               </div>
