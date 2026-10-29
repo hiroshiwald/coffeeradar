@@ -10,13 +10,17 @@ interface Props {
   onSelectNote: (note: string) => void;
 }
 
+// Below lg the row is a card: the image sits in the left padding, then roaster
+// and date, the coffee on its own line, type, process and price, and notes last.
+// Empty cells hide there so they leave no stray gap. Roaster names may wrap
+// between lg and xl so the table fits a 1024px screen.
 function CoffeeTableRow({ coffee: c, onSelectNote }: Props) {
   return (
     <tr
       style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 56px' }}
-      className="hover:bg-gray-50 dark:hover:bg-gray-900/30"
+      className="relative flex flex-wrap items-center gap-x-3 gap-y-1 py-3 pl-[68px] pr-4 lg:table-row hover:bg-gray-50 dark:hover:bg-gray-900/30"
     >
-      <td className="px-4 py-2">
+      <td className="absolute left-4 top-3 lg:static lg:px-4 lg:py-2">
         {c.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -43,14 +47,14 @@ function CoffeeTableRow({ coffee: c, onSelectNote }: Props) {
           </div>
         )}
       </td>
-      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(c.date)}</td>
-      <td className="px-4 py-3 font-medium whitespace-nowrap">{c.roaster}</td>
-      <td className="px-4 py-3">
+      <td className="lg:px-4 lg:py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(c.date)}</td>
+      <td className="order-first lg:px-4 lg:py-3 font-medium xl:whitespace-nowrap">{c.roaster}</td>
+      <td className="basis-full lg:px-4 lg:py-3">
         <a href={c.link} target="_blank" rel="noopener noreferrer" className="hover:underline underline-offset-2">
           {c.coffee}
         </a>
       </td>
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="max-lg:empty:hidden lg:px-4 lg:py-3 whitespace-nowrap">
         {c.isMerch ? (
           <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
             Merch
@@ -67,8 +71,8 @@ function CoffeeTableRow({ coffee: c, onSelectNote }: Props) {
           </span>
         ) : null}
       </td>
-      <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.process}</td>
-      <td className="px-4 py-3">
+      <td className="max-lg:empty:hidden lg:px-4 lg:py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">{c.process}</td>
+      <td className="basis-full order-last lg:px-4 lg:py-3">
         <div className="flex flex-wrap gap-1">
           {c.tastingNotes.map((note) => (
             <button
@@ -81,7 +85,7 @@ function CoffeeTableRow({ coffee: c, onSelectNote }: Props) {
           ))}
         </div>
       </td>
-      <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap font-mono text-xs tabular-nums">
+      <td className="max-lg:empty:hidden lg:px-4 lg:py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap font-mono text-xs tabular-nums">
         {c.price}
       </td>
     </tr>

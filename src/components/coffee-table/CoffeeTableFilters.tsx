@@ -29,9 +29,10 @@ export default function CoffeeTableFilters({
   onToggleMerch,
   onRefresh,
 }: Props) {
+  // Two columns below md: search across the top, then the selects and buttons in pairs.
   return (
-    <div className="flex flex-col sm:flex-row gap-3 mb-6">
-      <div className="relative flex-1">
+    <div className="grid grid-cols-2 md:flex gap-3 mb-6">
+      <div className="relative col-span-2 flex-1">
         <svg
           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
           fill="none"

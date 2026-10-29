@@ -62,7 +62,7 @@ export default function RoasterPanel({
 
   return (
     <div id={id} className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 text-[13px]">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 text-[13px]">
         <span className="font-medium text-[15px] truncate">{summary.name}</span>
         <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">{summary.count} recent</span>
         {hostname && (
